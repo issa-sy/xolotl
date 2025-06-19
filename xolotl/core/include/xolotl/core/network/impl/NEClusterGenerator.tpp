@@ -160,31 +160,28 @@ NEClusterGenerator::getReactionRadius(const Cluster<PlsmContext>& cluster,
 	const auto& reg = cluster.getRegion();
 	double radius = 0.0;
 	double FourPi = 4.0 * ::xolotl::core::pi;
+        double b = 0.116;
 	double omega =
 		0.25 * latticeParameter * latticeParameter * latticeParameter;
 	if (reg.isSimplex()) {
 		Composition comp(reg.getOrigin());
 		if (comp.isOnAxis(Species::I)) {
-			radius = latticeParameter / 2.0;
+			radius = sqrt(omega / ((FourPi / 4) * b));
 		}
 		else if (comp.isOnAxis(Species::Xe)) {
 			radius = impurityRadius;
 		}
 		else if (comp.isOnAxis(Species::V)) {
-			radius = latticeParameter * sqrt(2.0) / 2.0;
+			radius = cbrt((3.0 * omega) / (FourPi));
 		}
 		else {
-			radius = latticeParameter * sqrt(2.0) / 2.0 +
-				cbrt((3.0 * omega * (double)comp[Species::V]) / FourPi) -
-				cbrt((3.0 * omega) / FourPi);
+			radius = cbrt((3.0 * omega) / (FourPi)) * cbrt((double)comp[Species::V]);
 		}
 	}
 	else {
 		// Loop on the V range
 		for (auto j : makeIntervalRange(reg[Species::V])) {
-			radius += latticeParameter * sqrt(2.0) / 2.0 +
-				cbrt((3.0 * omega * (double)j) / FourPi) -
-				cbrt((3.0 * omega) / FourPi);
+			radius += cbrt((3.0 * omega) / (FourPi)) * cbrt((double)j);
 		}
 		// Average the radius
 		radius /= reg[Species::V].length();
