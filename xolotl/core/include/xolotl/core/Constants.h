@@ -48,7 +48,10 @@ constexpr double alphaZrCoreRadius = 0.64500000000000000;
 constexpr double heliumRadius = 0.30000000000000000;
 
 //! Single xenon radius. Given in units here of nm.
-constexpr double xenonRadius = 0.30000000000000000;
+constexpr double xenonRadius = 0.20000000000000000;
+
+//! Core radius. Given in units here of nm.
+constexpr double xenonCoreRadius = 0.30000000000000000;
 
 // Tungsten heat coefficient = 1 / (rho * C)
 // constexpr double tungstenHeatCoefficient = 1.236e13;
