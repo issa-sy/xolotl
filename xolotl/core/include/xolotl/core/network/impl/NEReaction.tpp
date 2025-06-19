@@ -20,8 +20,9 @@ getRate(const TRegion& pairCl0Reg, const TRegion& pairCl1Reg, const double r0,
 	const double r1, const double dc0, const double dc1)
 {
 	constexpr double pi = ::xolotl::core::pi;
+        constexpr double rCore = ::xolotl::core::xenonCoreRadius;
 
-	double kPlus = 4.0 * pi * (r0 + r1) * (dc0 + dc1) * ::xolotl::core::zFactor;
+	double kPlus = 4.0 * pi * (r0 + r1 + rCore) * (dc0 + dc1);
 
 	return kPlus;
 }
