@@ -1070,7 +1070,7 @@ NESinkReaction::getSinkStrength()
 {
 	// Not actually used
 	//	return 1.0e-3;
-	return 1.0e-4 * ::xolotl::core::zFactor;
+	return 2.04e-4;
 }
 
 KOKKOS_INLINE_FUNCTION
