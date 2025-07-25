@@ -4,6 +4,7 @@
 #include <xolotl/core/network/impl/ReSolutionReaction.tpp>
 #include <xolotl/core/network/impl/Reaction.tpp>
 #include <xolotl/core/network/impl/SinkReaction.tpp>
+#include <fstream>
 
 namespace xolotl
 {
@@ -20,7 +21,7 @@ getRate(const TRegion& pairCl0Reg, const TRegion& pairCl1Reg, const double r0,
 	const double r1, const double dc0, const double dc1)
 {
 	constexpr double pi = ::xolotl::core::pi;
-        constexpr double rCore = ::xolotl::core::xenonCoreRadius;
+	constexpr double rCore = ::xolotl::core::xenonCoreRadius;
 
 	double kPlus = 4.0 * pi * (r0 + r1 + rCore) * (dc0 + dc1);
 
@@ -685,15 +686,11 @@ NEDissociationReaction::computeBindingEnergy()
 	using Species = typename Superclass::Species;
 	using Composition = typename Superclass::Composition;
 
-	double be = 5.0;
+	double be = 10.0;
 
 	auto cl = this->_clusterData->getCluster(this->_reactant);
 	auto prod1 = this->_clusterData->getCluster(this->_products[0]);
 	auto prod2 = this->_clusterData->getCluster(this->_products[1]);
-	auto iFormation = this->_clusterData->getIFormationEnergy();
-	auto vFormation = this->_clusterData->getVFormationEnergy();
-	auto v2Formation = this->_clusterData->getV2FormationEnergy();
-	auto xeFormation = this->_clusterData->getXeFormationEnergy();
 
 	auto clReg = cl.getRegion();
 	auto prod1Reg = prod1.getRegion();
@@ -702,62 +699,65 @@ NEDissociationReaction::computeBindingEnergy()
 	Composition hi = clReg.getUpperLimitPoint();
 	Composition prod1Comp = prod1Reg.getOrigin();
 	Composition prod2Comp = prod2Reg.getOrigin();
-	auto amtXe = (double)(lo[Species::Xe] + hi[Species::Xe] - 1) / 2.0;
-	auto amtV = (double)(lo[Species::V] + hi[Species::V] - 1) / 2.0;
+	
 
-	// Compute the delta_G = G(p1) + G(p2) - G(r)
-	// Get the cluster ratio first
-	double xeSD = amtXe / amtV;
+	//if (lo.isOnAxis(Species::V)) {
+			if (prod1Comp.isOnAxis(Species::V) or prod2Comp.isOnAxis(Species::V)) {
+				double n = (double)(lo[Species::V] + hi[Species::V] - 1) / 2.0;
+					if (n < 16)
+						be = 25.59 * (pow(n, -0.8));
+					else 
+							be = 2.0;
+		//-***************************************************************************************************
+					std::cout << "Cas V : n=" << n << ", be=" << be << std::endl;
+					//  Enregistrement dans un fichier texte
+    						std::ofstream outFile("resultats_BE.txt", std::ios::app);
+    						if (outFile.is_open()) {
+       						 outFile << "Cas V : n=" << n << ", be=" << be << std::endl;
+       						 outFile.close();
+    						} else {
+       					 		std::cerr << "Erreur : impossible d'ouvrir le fichier !" << std::endl;
+   							 }
+		//-***************************************************************************************************
+			}			
+	//}
 
-	if (amtV == 0)
-		return 5.0;
+	//else if (lo.isOnAxis(Species::I)) {
+			if (prod1Comp.isOnAxis(Species::I) or prod2Comp.isOnAxis(Species::I)) {
+				double n = (double)(lo[Species::I] + hi[Species::I] - 1) / 2.0;
+				if (n < 11)	
+						be = 0.0049 * (pow(n, 3.93));	
+				else
+						be = 10.0;
+			}		
+	//}
 
-	// Fit parameters
-	double fitParams[8] = {0.022098470861651, -0.328234592987279,
-		1.9501944029492, -5.85771773178376, 9.18869701523602, -7.09118822290571,
-		3.37190513184659, -1.03326651166341};
+	//else if (lo.isOnAxis(Species::Xe)) {
+			if (prod1Comp.isOnAxis(Species::Xe) or prod2Comp.isOnAxis(Species::Xe)) {
+				double n = (double)(lo[Species::Xe] + hi[Species::Xe] - 1) / 2.0;
+				if (n < 11)	
+						be = 0.0012 * (pow(n, 4.41));	
+				else
+						be = 10.0;
+			}
+	//}
+	//-***************************************************************************************************
+	//be = util::min(10.0, util::max(be, -10.0));
+	//std::cout << "BE final = " << be << std::endl;
 
-	if (prod1Comp.isOnAxis(Species::V) or prod2Comp.isOnAxis(Species::V)) {
-		double xeSDPower = xeSD * xeSD;
-		be = 0.0;
-		for (auto i = 0; i < 8; i++) {
-			be += (double)(i + 1) * fitParams[7 - i] * xeSDPower;
-			xeSDPower *= xeSD;
-		}
+	// Enregistrement dans un fichier texte
+    	//	std::ofstream outFile("resultats_BE.txt", std::ios::app);
+    	//	if (outFile.is_open()) {
+       	//	 outFile << "BE final = " << be << std::endl;
+       	//	 outFile.close();
+    	//	} else {
+        //		std::cerr << "Erreur : impossible d'ouvrir le fichier !" << std::endl;
+   	//		 }
+	//return be;
+	//-***************************************************************************************************
 
-		if (prod1Comp.isOnAxis(Species::V) and prod1Comp[Species::V] == 2) {
-			be *= 2.0;
-			be += v2Formation;
-		}
-		else if (prod2Comp.isOnAxis(Species::V) and
-			prod2Comp[Species::V] == 2) {
-			be *= 2.0;
-			be += v2Formation;
-		}
-		else {
-			be += vFormation;
-		}
-	}
-	if (prod1Comp.isOnAxis(Species::I) or prod2Comp.isOnAxis(Species::I)) {
-		double xeSDPower = xeSD * xeSD;
-		be = 0.0;
-		for (auto i = 0; i < 8; i++) {
-			be -= (double)(i + 1) * fitParams[7 - i] * xeSDPower;
-			xeSDPower *= xeSD;
-		}
-		be += iFormation;
-	}
-	if (prod1Comp.isOnAxis(Species::Xe) or prod2Comp.isOnAxis(Species::Xe)) {
-		double xeSDPower = xeSD;
-		be = 0.0;
-		for (auto i = 0; i < 8; i++) {
-			be -= (double)(i + 2) * fitParams[7 - i] * xeSDPower;
-			xeSDPower *= xeSD;
-		}
-		be += xeFormation;
-	}
+	return util::min(10.0, util::max(be, -10.0));
 
-	return util::min(5.0, util::max(be, -1.0));
 }
 
 KOKKOS_INLINE_FUNCTION
