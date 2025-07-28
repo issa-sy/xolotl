@@ -105,7 +105,7 @@ NEClusterGenerator::select(const Region& region) const
 	}
 
 	// Vacancy
-	if (region[Species::V].begin() > 2 && region[Species::Xe].end() == 1 &&
+	if (region[Species::V].begin() > 3 && region[Species::Xe].end() == 1 &&
 		region[Species::I].end() == 1) {
 		return false;
 	}
@@ -160,7 +160,7 @@ NEClusterGenerator::getReactionRadius(const Cluster<PlsmContext>& cluster,
 	const auto& reg = cluster.getRegion();
 	double radius = 0.0;
 	double FourPi = 4.0 * ::xolotl::core::pi;
-        double b = 0.116;
+    double b = 0.116;
 	double omega =
 		0.25 * latticeParameter * latticeParameter * latticeParameter;
 	if (reg.isSimplex()) {
