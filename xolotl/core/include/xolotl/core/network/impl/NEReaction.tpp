@@ -691,6 +691,7 @@ NEDissociationReaction::computeBindingEnergy()
 	auto cl = this->_clusterData->getCluster(this->_reactant);
 	auto prod1 = this->_clusterData->getCluster(this->_products[0]);
 	auto prod2 = this->_clusterData->getCluster(this->_products[1]);
+	auto iFormation = this->_clusterData->getIFormationEnergy();
 
 	auto clReg = cl.getRegion();
 	auto prod1Reg = prod1.getRegion();
@@ -699,19 +700,29 @@ NEDissociationReaction::computeBindingEnergy()
 	Composition hi = clReg.getUpperLimitPoint();
 	Composition prod1Comp = prod1Reg.getOrigin();
 	Composition prod2Comp = prod2Reg.getOrigin();
-	
 
-	//if (lo.isOnAxis(Species::V)) {
+	auto amtXe = (double)(lo[Species::Xe] + hi[Species::Xe] - 1) / 2.0;
+	auto amtV = (double)(lo[Species::V] + hi[Species::V] - 1) / 2.0;
+
+	// Compute the delta_G = G(p1) + G(p2) - G(r)
+	// Get the cluster ratio first
+	double xeSD = amtXe / amtV;
+	// Fit parameters
+	double fitParams[8] = {0.022098470861651, -0.328234592987279,
+		1.9501944029492, -5.85771773178376, 9.18869701523602, -7.09118822290571,
+		3.37190513184659, -1.03326651166341};
+	
+	//-*******************************************************************************************************
 			if (prod1Comp.isOnAxis(Species::V) or prod2Comp.isOnAxis(Species::V)) {
 				double n = (double)(lo[Species::V] + hi[Species::V] - 1) / 2.0;
-					if (n < 16)
-						be = 25.59 * (pow(n, -0.8));
-					else 
-							be = 2.0;
+					if (n < 11)
+						be = (pow(n, 0.5));	
+					else
+						be = 3.8;
 		//-***************************************************************************************************
 					std::cout << "Cas V : n=" << n << ", be=" << be << std::endl;
 					//  Enregistrement dans un fichier texte
-    						std::ofstream outFile("resultats_BE.txt", std::ios::app);
+    						std::ofstream outFile("resultats_BE_V.txt", std::ios::app);
     						if (outFile.is_open()) {
        						 outFile << "Cas V : n=" << n << ", be=" << be << std::endl;
        						 outFile.close();
@@ -720,43 +731,70 @@ NEDissociationReaction::computeBindingEnergy()
    							 }
 		//-***************************************************************************************************
 			}			
-	//}
 
-	//else if (lo.isOnAxis(Species::I)) {
 			if (prod1Comp.isOnAxis(Species::I) or prod2Comp.isOnAxis(Species::I)) {
-				double n = (double)(lo[Species::I] + hi[Species::I] - 1) / 2.0;
-				if (n < 11)	
-						be = 0.0049 * (pow(n, 3.93));	
-				else
-						be = 10.0;
-			}		
-	//}
+				 /*double n = (double)(lo[Species::I] + hi[Species::I] - 1) / 2.0;
+				 if (n < 11 )
+						be = 4.0 * (pow(n, 0.5));	
+					else
+						be = 10;
+				*/
+				double xeSDPower = xeSD * xeSD;
+				be = 0.0;
+				for (auto i = 0; i < 16; i++) {
+				be -= (double)(i + 1) * fitParams[15 - i] * xeSDPower;
+				xeSDPower *= xeSD;
+				}
+				be += iFormation;
+				
+		//-***************************************************************************************************
+					std::cout << "Cas I : n=" << xeSDPower << ", be=" << be << std::endl;
+					//  Enregistrement dans un fichier texte
+    						std::ofstream outFile("resultats_BE_I.txt", std::ios::app);
+    						if (outFile.is_open()) {
+       						 outFile << "Cas I : n=" << xeSDPower << ", be=" << be << std::endl;
+       						 outFile.close();
+    						} else {
+       					 		std::cerr << "Erreur : impossible d'ouvrir le fichier !" << std::endl;
+   							 }
+		//-***************************************************************************************************
+			
+		}		
 
-	//else if (lo.isOnAxis(Species::Xe)) {
 			if (prod1Comp.isOnAxis(Species::Xe) or prod2Comp.isOnAxis(Species::Xe)) {
 				double n = (double)(lo[Species::Xe] + hi[Species::Xe] - 1) / 2.0;
-				if (n < 11)	
-						be = 0.0012 * (pow(n, 4.41));	
-				else
-						be = 10.0;
+					if (n  < 11 )	
+						be = n ;
+					else
+						be = 10;
+		//-***************************************************************************************************
+					std::cout << "Cas Xe : n=" << n << ", be=" << be << std::endl;
+					//  Enregistrement dans un fichier texte
+    						std::ofstream outFile("resultats_BE_Xe.txt", std::ios::app);
+    						if (outFile.is_open()) {
+       						 outFile << "Cas Xe : n=" << n << ", be=" << be << std::endl;
+       						 outFile.close();
+    						} else {
+       					 		std::cerr << "Erreur : impossible d'ouvrir le fichier !" << std::endl;
+   							 }
+		//-***************************************************************************************************
 			}
-	//}
 	//-***************************************************************************************************
-	//be = util::min(10.0, util::max(be, -10.0));
-	//std::cout << "BE final = " << be << std::endl;
+	be = util::min(10.0, util::max(be, -10.0));
+	std::cout << "BE final = " << be << std::endl;
 
 	// Enregistrement dans un fichier texte
-    	//	std::ofstream outFile("resultats_BE.txt", std::ios::app);
-    	//	if (outFile.is_open()) {
-       	//	 outFile << "BE final = " << be << std::endl;
-       	//	 outFile.close();
-    	//	} else {
-        //		std::cerr << "Erreur : impossible d'ouvrir le fichier !" << std::endl;
-   	//		 }
-	//return be;
+    		std::ofstream outFile("resultats_beFinal.txt", std::ios::app);
+    		if (outFile.is_open()) {
+       		 outFile << "BE final = " << be << std::endl;
+       		 outFile.close();
+    		} else {
+        		std::cerr << "Erreur : impossible d'ouvrir le fichier !" << std::endl;
+   			 }
+	return be;
 	//-***************************************************************************************************
 
-	return util::min(10.0, util::max(be, -10.0));
+	//return util::min(10.0, util::max(be, -10.0));
 
 }
 
