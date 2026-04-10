@@ -298,7 +298,7 @@ JSONOptions::defineHandlers()
 		.add(
 			"process", ElemType::list_string,
 			"List of all the processes to use in the simulation.\n"
-			"{reaction, diff, advec, modifiedTM, movingSurface, "
+			"{reaction, diff, spherical, advec, modifiedTM, movingSurface, "
 			"bursting, attenuation, resolution, heterogeneous, "
 			"sink, soret, constant, noSolve}",
 			JSON_ELEM_HANDLER {
@@ -505,12 +505,12 @@ JSONOptions::defineHandlers()
 				checkSetParam(tree, name, migrationThreshold);
 			})
 		.add(
-			"fluxDepthProfileFilePath", ElemType::string,
+			"customFluxFilePath", ElemType::string,
 			"The path to the custom flux profile file; the default is an empty "
 			"string that will use the default material associated flux "
 			"handler.",
 			JSON_ELEM_HANDLER {
-				checkSetParam(tree, name, fluxDepthProfileFilePath);
+				checkSetParam(tree, name, customFluxFilePath);
 			})
 		.add(
 			"reactionFilePath", ElemType::string,
@@ -581,7 +581,18 @@ JSONOptions::readParams(int argc, const char* argv[])
 	auto ss = stripComments(ifs);
 	boost::property_tree::read_json(ss, *_map);
 
-	defineHandlers().processParams();
+	auto handlers = defineHandlers();
+
+	// Checking the option names first
+	auto& tree = *_map;
+	for (const auto& leaf : tree) {
+		if (!handlers.checkName(leaf.first)) {
+			throw InvalidOptionValue(
+				"Options: unsupported option: " + leaf.first);
+		}
+	}
+
+	handlers.processParams();
 }
 } // namespace options
 } // namespace xolotl
