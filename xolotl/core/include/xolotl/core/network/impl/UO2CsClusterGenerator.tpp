@@ -9,7 +9,7 @@ namespace core
 {
 namespace network
 {
-KOKKOS_INLIUO2Cs_FUNCTION
+KOKKOS_INLINE_FUNCTION
 bool
 UO2CsClusterGenerator::refine(const Region& region, BoolArray& result) const
 {
@@ -79,7 +79,7 @@ UO2CsClusterGenerator::refine(const Region& region, BoolArray& result) const
 	return true;
 }
 
-KOKKOS_INLIUO2Cs_FUNCTION
+KOKKOS_INLINE_FUNCTION
 bool
 UO2CsClusterGenerator::select(const Region& region) const
 {
@@ -123,7 +123,7 @@ UO2CsClusterGenerator::select(const Region& region) const
 }
 
 template <typename PlsmContext>
-KOKKOS_INLIUO2Cs_FUNCTION
+KOKKOS_INLINE_FUNCTION
 double
 UO2CsClusterGenerator::getFormationEnergy(
 	const Cluster<PlsmContext>& cluster) const noexcept
@@ -133,7 +133,7 @@ UO2CsClusterGenerator::getFormationEnergy(
 }
 
 template <typename PlsmContext>
-KOKKOS_INLIUO2Cs_FUNCTION
+KOKKOS_INLINE_FUNCTION
 double
 UO2CsClusterGenerator::getMigrationEnergy(
 	const Cluster<PlsmContext>& cluster) const noexcept
@@ -142,7 +142,7 @@ UO2CsClusterGenerator::getMigrationEnergy(
 }
 
 template <typename PlsmContext>
-KOKKOS_INLIUO2Cs_FUNCTION
+KOKKOS_INLINE_FUNCTION
 double
 UO2CsClusterGenerator::getDiffusionFactor(
 	const Cluster<PlsmContext>& cluster, double latticeParameter) const noexcept
@@ -151,7 +151,7 @@ UO2CsClusterGenerator::getDiffusionFactor(
 }
 
 template <typename PlsmContext>
-KOKKOS_INLIUO2Cs_FUNCTION
+KOKKOS_INLINE_FUNCTION
 double
 UO2CsClusterGenerator::getReactionRadius(const Cluster<PlsmContext>& cluster,
 	double latticeParameter, double interstitialBias,

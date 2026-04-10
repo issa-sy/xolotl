@@ -756,7 +756,7 @@ UO2CsDissociationReaction::computeBindingEnergy()
 	return util::min(5.0, util::max(be, -1.0));
 }
 
-KOKKOS_INLIUO2Cs_FUNCTION
+KOKKOS_INLINE_FUNCTION
 double
 UO2CsDissociationReaction::getRateForProduction(IndexType gridIndex)
 {
@@ -772,7 +772,7 @@ UO2CsDissociationReaction::getRateForProduction(IndexType gridIndex)
 	return ne::getRate(cl0.getRegion(), cl1.getRegion(), r0, r1, dc0, dc1);
 }
 
-KOKKOS_INLIUO2Cs_FUNCTION
+KOKKOS_INLINE_FUNCTION
 double
 UO2CsDissociationReaction::computeRate(IndexType gridIndex, double time)
 {
@@ -818,7 +818,7 @@ UO2CsDissociationReaction::computeRate(IndexType gridIndex, double time)
 	return kMinus;
 }
 
-KOKKOS_INLIUO2Cs_FUNCTION
+KOKKOS_INLINE_FUNCTION
 void
 UO2CsDissociationReaction::computeFlux(
 	ConcentrationsView concentrations, FluxesView fluxes, IndexType gridIndex)
@@ -883,7 +883,7 @@ UO2CsDissociationReaction::computeFlux(
 	}
 }
 
-KOKKOS_INLIUO2Cs_FUNCTION
+KOKKOS_INLINE_FUNCTION
 void
 UO2CsDissociationReaction::computePartialDerivatives(
 	ConcentrationsView concentrations, Kokkos::View<double*> values,
@@ -972,7 +972,7 @@ UO2CsDissociationReaction::computePartialDerivatives(
 	}
 }
 
-KOKKOS_INLIUO2Cs_FUNCTION
+KOKKOS_INLINE_FUNCTION
 void
 UO2CsDissociationReaction::computeReducedPartialDerivatives(
 	ConcentrationsView concentrations, Kokkos::View<double*> values,
@@ -1035,7 +1035,7 @@ UO2CsDissociationReaction::computeReducedPartialDerivatives(
 	}
 }
 
-KOKKOS_INLIUO2Cs_FUNCTION
+KOKKOS_INLINE_FUNCTION
 double
 UO2CsSinkReaction::getSinkBias()
 {

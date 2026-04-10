@@ -103,7 +103,7 @@ public:
 
 	using Superclass::Superclass;
 
-	KOKKOS_INLIUO2Cs_FUNCTION
+	KOKKOS_INLINE_FUNCTION
 	UO2CsDissociationReaction(ReactionDataRef reactionData,
 		const ClusterData& clusterData, IndexType reactionId,
 		IndexType cluster0, IndexType cluster1, IndexType cluster2) :
@@ -152,7 +152,7 @@ private:
 	computePartialDerivatives(ConcentrationsView concentrations,
 		Kokkos::View<double*> values, IndexType gridIndex);
 
-	KOKKOS_INLIUO2Cs_FUNCTION
+	KOKKOS_INLINE_FUNCTION
 	void
 	computeReducedPartialDerivatives(ConcentrationsView concentrations,
 		Kokkos::View<double*> values, IndexType gridIndex);
@@ -208,11 +208,11 @@ public:
 	{
 	}
 
-	KOKKOS_INLIUO2Cs_FUNCTION
+	KOKKOS_INLINE_FUNCTION
 	double
 	getSinkBias();
 
-	KOKKOS_INLIUO2Cs_FUNCTION
+	KOKKOS_INLINE_FUNCTION
 	double
 	getSinkStrength();
 

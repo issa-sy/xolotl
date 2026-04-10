@@ -121,7 +121,7 @@ public:
 	using ClusterData = typename NetworkType::ClusterData;
 	using IndexType = typename NetworkType::IndexType;
 
-	KOKKOS_INLIUO2Cs_FUNCTION
+	KOKKOS_INLINE_FUNCTION
 	void
 	updateDiffusionCoefficient(const ClusterData& data, IndexType clusterId,
 		IndexType gridIndex) const;
