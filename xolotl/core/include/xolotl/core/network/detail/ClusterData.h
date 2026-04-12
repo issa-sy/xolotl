@@ -149,6 +149,7 @@ private:
 		XE_FORMATION,
 		V_FORMATION,
 		V2_FORMATION,
+		CS_FORMATION,
 		NUM_FLOAT_VALS
 	};
 
@@ -283,6 +284,19 @@ public:
 	setXeFormationEnergy(double val)
 	{
 		setVal(_floatVals, XE_FORMATION, val);
+	}
+
+	KOKKOS_INLINE_FUNCTION
+	double
+	getCsFormationEnergy() const
+	{
+		return _floatVals[CS_FORMATION];
+	}
+
+	void
+	setCsFormationEnergy(double val)
+	{
+		setVal(_floatVals, CS_FORMATION, val);
 	}
 
 	KOKKOS_INLINE_FUNCTION

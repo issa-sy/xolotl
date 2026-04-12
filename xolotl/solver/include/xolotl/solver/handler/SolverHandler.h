@@ -112,6 +112,11 @@ protected:
 	// fraction
 	std::vector<std::vector<std::vector<std::array<double, 4>>>> localNE;
 
+	//! The vector of quantities to pass to MOOSE.
+	// 0: Cs rate, 1: previous flux, 2: monomer concentration, 3: volume
+	// fraction
+	std::vector<std::vector<std::vector<std::array<double, 4>>>> localUO2Cs;
+
 	//! The electronic stopping power for re-solution
 	double electronicStoppingPower;
 
@@ -180,6 +185,9 @@ protected:
 
 	//! The number of xenon atoms that went to the GB
 	double nXeGB;
+
+	//! The number of cesium atoms that went to the GB
+	double nCsGB;
 
 	//! The grid options
 	std::string gridType;
@@ -328,9 +336,24 @@ public:
 	 * \see ISolverHandler.h
 	 */
 	void
+	createLocalUO2Cs(IdType a, IdType b = 1, IdType c = 1) override;
+
+	/**
+	 * \see ISolverHandler.h
+	 */
+	void
 	setLocalXeRate(double rate, IdType i, IdType j = 0, IdType k = 0) override
 	{
 		std::get<0>(localNE[i][j][k]) += rate;
+	}
+
+	/**
+	 * \see ISolverHandler.h
+	 */
+	void
+	setLocalCsRate(double rate, IdType i, IdType j = 0, IdType k = 0) override
+	{
+		std::get<0>(localUO2Cs[i][j][k]) += rate;
 	}
 
 	/**
@@ -347,10 +370,30 @@ public:
 	/**
 	 * \see ISolverHandler.h
 	 */
+	void
+	setLocalUO2Cs(
+		const std::vector<std::vector<std::vector<std::array<double, 4>>>>&
+			rateVector) override
+	{
+		localUO2Cs = rateVector;
+	}
+
+	/**
+	 * \see ISolverHandler.h
+	 */
 	std::vector<std::vector<std::vector<std::array<double, 4>>>>&
 	getLocalNE() override
 	{
 		return localNE;
+	}
+	
+	/**
+	 * \see ISolverHandler.h
+	 */
+	std::vector<std::vector<std::vector<std::array<double, 4>>>>&
+	getLocalUO2Cs() override
+	{
+		return localUO2Cs;
 	}
 
 	/**
@@ -367,9 +410,28 @@ public:
 	 * \see ISolverHandler.h
 	 */
 	void
+	setPreviousCsFlux(
+		double flux, IdType i, IdType j = 0, IdType k = 0) override
+	{
+		std::get<1>(localUO2Cs[i][j][k]) = flux;
+	}
+
+	/**
+	 * \see ISolverHandler.h
+	 */
+	void
 	setMonomerConc(double conc, IdType i, IdType j = 0, IdType k = 0) override
 	{
 		std::get<2>(localNE[i][j][k]) = conc;
+	}
+
+	/**
+	 * \see ISolverHandler.h
+	 */
+	void
+	setMonomerConc(double conc, IdType i, IdType j = 0, IdType k = 0) override
+	{
+		std::get<2>(localUO2Cs[i][j][k]) = conc;
 	}
 
 	/**
@@ -380,6 +442,16 @@ public:
 		double frac, IdType i, IdType j = 0, IdType k = 0) override
 	{
 		std::get<3>(localNE[i][j][k]) = frac;
+	}
+
+	/**
+	 * \see ISolverHandler.h
+	 */
+	void
+	setVolumeFraction(
+		double frac, IdType i, IdType j = 0, IdType k = 0) override
+	{
+		std::get<3>(localUO2Cs[i][j][k]) = frac;
 	}
 
 	/**
@@ -488,6 +560,14 @@ public:
 	{
 		return nXeGB;
 	}
+	/**
+	 * \see ISolverHandler.h
+	 */
+	double
+	getNCsGB() override
+	{
+		return nCsGB;
+	}
 
 	/**
 	 * \see ISolverHandler.h
@@ -496,6 +576,15 @@ public:
 	setNXeGB(double nXe) override
 	{
 		nXeGB = nXe;
+	}
+
+	/**
+	 * \see ISolverHandler.h
+	 */
+	void
+	setNCsGB(double nCs) override
+	{
+		nCsGB = nCs;
 	}
 
 	/**

@@ -185,8 +185,8 @@ ConfOptions::readParams(int argc, const char* argv[])
 		"whether each process should print the seed value "
 		"it uses (default = don't print).")("density",
 		bpo::value<double>(&density),
-		"Sets a density in nm-3 for the number of xenon per volume in a bubble "
-		"for the NE case (default is 10.162795276841 nm-3 as before).")("pulse",
+		"Sets a density in nm-3 for the number of xenon and cesium per volume in a bubble "
+		"for the NE and UO2Cs case (default is 10.162795276841 nm-3 as before).")("pulse",
 		bpo::value<std::string>(),
 		"The total length of the pulse (in s) if the Pulsed material is used, "
 		"and the proportion of it that is "
@@ -201,9 +201,11 @@ ConfOptions::readParams(int argc, const char* argv[])
 		bpo::value<double>(&hydrogenFactor),
 		"The factor between the size of He and H.")("xenonDiffusivity",
 		bpo::value<double>(&xenonDiffusivity),
-		"The diffusion coefficient for xenon in nm2 s-1.")("fissionYield",
+		"The factor between the size of He and H.")("cesiumDiffusivity",
+		bpo::value<double>(&cesiumDiffusivity),
+		"The diffusion coefficient for xenon and cesium in nm2 s-1.")("fissionYield",
 		bpo::value<double>(&fissionYield),
-		"The number of xenon created for each fission (default is 0.25).")(
+		"The number of xenon and cesium created for each fission (default is 0.25).")(
 		"heVRatio", bpo::value<double>(&heVRatio),
 		"The number of He atoms allowed per V in a bubble.")(
 		"migrationThreshold", bpo::value<double>(&migrationThreshold),

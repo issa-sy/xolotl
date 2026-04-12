@@ -296,7 +296,7 @@ protected:
 	double latticeParameter;
 
 	/**
-	 * Radius of the main impurity (He, Xe) in nm.
+	 * Radius of the main impurity (He, Xe, Cs) in nm.
 	 */
 	double impurityRadius;
 
@@ -317,7 +317,12 @@ protected:
 	double xenonDiffusivity;
 
 	/**
-	 * Fission yield, how many xenon atoms are created per fission
+	 * Cesium diffusion coefficient in nm2 s-1
+	 */
+	double cesiumDiffusivity;
+
+	/**
+	 * Fission yield, how many xenon and cesium atoms are created per fission
 	 */
 	double fissionYield;
 
@@ -957,6 +962,15 @@ public:
 	getXenonDiffusivity() const override
 	{
 		return xenonDiffusivity;
+	}
+
+	/**
+	 * \see IOptions.h
+	 */
+	virtual double
+	getCesiumDiffusivity() const override
+	{
+		return cesiumDiffusivity;
 	}
 
 	/**

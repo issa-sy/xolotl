@@ -302,6 +302,22 @@ public:
 	setNXeGB(double nXe);
 
 	/**
+	 * Get the number of Cs that went to the GB.
+	 *
+	 * @return The number of Cesium
+	 */
+	double
+	getNCsGB();
+
+	/**
+	 * Set the number of Cs that went to the GB.
+	 *
+	 * @param nCs The number of Cesium
+	 */
+	void
+	setNCsGB(double nCs);
+
+	/**
 	 * Get the TS from the solver.
 	 *
 	 * @return The TS

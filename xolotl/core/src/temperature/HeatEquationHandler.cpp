@@ -88,6 +88,11 @@ HeatEquationHandler::HeatEquationHandler(const options::IOptions& options) :
 		this->setHeatCoefficient(core::uo2HeatCoefficient);
 		this->setHeatConductivity(core::uo2HeatConductivity);
 	}
+	// UO2Cs case
+	else if (problemType == "UO2Cs") {
+		this->setHeatCoefficient(core::uo2csHeatCoefficient);
+		this->setHeatConductivity(core::uo2csHeatConductivity);
+	}
 	// Fe case
 	else if (problemType == "Fe") {
 		this->setHeatCoefficient(core::feHeatCoefficient);

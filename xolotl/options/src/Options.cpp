@@ -80,6 +80,7 @@ Options::Options() :
 	biasFactor(1.15),
 	hydrogenFactor(0.25),
 	xenonDiffusivity(-1.0),
+	cesiumDiffusivity(-1.0),
 	fissionYield(0.25),
 	heVRatio(4.0),
 	migrationThreshold(std::numeric_limits<double>::infinity()),
@@ -177,6 +178,7 @@ Options::printAll(std::ostream& os) const
 	os << "biasFactor: " << biasFactor << '\n';
 	os << "hydrogenFactor: " << hydrogenFactor << '\n';
 	os << "xenonDiffusivity: " << xenonDiffusivity << '\n';
+	os << "cesiumDiffusivity: " << cesiumDiffusivity << '\n';
 	os << "fissionYield: " << fissionYield << '\n';
 	os << "heVRatio: " << heVRatio << '\n';
 	os << "migrationThreshold: " << migrationThreshold << '\n';

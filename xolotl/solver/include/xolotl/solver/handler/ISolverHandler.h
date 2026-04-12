@@ -147,6 +147,14 @@ public:
 	 */
 	virtual double
 	getNXeGB() = 0;
+	
+	/**
+	 * Get the number of Cs that went to the GB.
+	 *
+	 * @return The number of Cesium
+	 */
+	virtual double
+	getNCsGB() = 0;
 
 	/**
 	 * Set the number of Xe that went to the GB.
@@ -155,6 +163,14 @@ public:
 	 */
 	virtual void
 	setNXeGB(double nXe) = 0;
+
+	/**
+	 * Set the number of Cs that went to the GB.
+	 *
+	 * @param nCs The number of Cesium
+	 */
+	virtual void
+	setNCsGB(double nCs) = 0;
 
 	/**
 	 * Compute the new concentrations for the RHS function given an initial
@@ -320,6 +336,14 @@ public:
 	createLocalNE(IdType a, IdType b = 1, IdType c = 1) = 0;
 
 	/**
+	 * 
+	 * @param a The size in the x direction
+	 * @param b The size in the y direction	
+	 * @param c The size in the z direction
+	 */
+	virtual void
+	createLocalUO2Cs(IdType a, IdType b = 1, IdType c = 1) = 0;
+	/**
 	 * Set the latest value of the local Xe rate.
 	 *
 	 * @param rate The latest value of rate
@@ -329,6 +353,17 @@ public:
 	 */
 	virtual void
 	setLocalXeRate(double rate, IdType i, IdType j = 0, IdType k = 0) = 0;
+
+	/**
+	 * Set the latest value of the local Cs rate.
+	 * 
+	 * @param rate The latest value of rate
+	 * @param i The x coordinate of the location
+	 * @param j The y coordinate of the location
+	 * @param z The z coordinate of the location
+	 */
+	virtual void
+	setLocalCsRate(double rate, IdType i, IdType j = 0, IdType k = 0) = 0;
 
 	/**
 	 * Set the whole vector of local NE data.
@@ -341,12 +376,30 @@ public:
 			rateVector) = 0;
 
 	/**
+	 * Set the whole vector of local UO2Cs data.
+	 * 
+	 * @param rateVector The vector
+	 */
+	virtual void
+	setLocalUO2Cs(
+		const std::vector<std::vector<std::vector<std::array<double, 4>>>>&
+			rateVector) = 0;
+
+	/**
 	 * Get the local NE data vector that needs to be passed to an app.
 	 *
 	 * @return The vector
 	 */
 	virtual std::vector<std::vector<std::vector<std::array<double, 4>>>>&
 	getLocalNE() = 0;
+
+	/**
+	 * Get the local UO2Cs data vector that needs to be passed to an app.
+	 *
+	 * @return The vector
+	 */
+	virtual std::vector<std::vector<std::vector<std::array<double, 4>>>>&
+	getLocalUO2Cs() = 0;
 
 	/**
 	 * Get the network temperature and depth that can be passed to an app.
@@ -370,7 +423,18 @@ public:
 	setPreviousXeFlux(double flux, IdType i, IdType j = 0, IdType k = 0) = 0;
 
 	/**
-	 * Set the latest value of the Xe monomer concentration.
+	 * Set the latest value of the local Cs flux.
+	 *
+	 * @param flux The latest value of flux
+	 * @param i The x coordinate of the location
+	 * @param j The y coordinate of the location
+	 * @param z The z coordinate of the location
+	 */
+	virtual void
+	setPreviousCsFlux(double flux, IdType i, IdType j = 0, IdType k = 0) = 0;
+
+	/**
+	 * Set the latest value of the Xe and Cs monomer concentration.
 	 *
 	 * @param conc The latest value of conc
 	 * @param i The x coordinate of the location

@@ -331,6 +331,20 @@ XolotlInterface::setNXeGB(double nXe) TRY
 }
 CATCH
 
+double
+XolotlInterface::getNCsGB() TRY
+{
+	return solverCast(solver)->getSolverHandler()->getNCsGB();
+}
+CATCH
+
+void
+XolotlInterface::setNCsGB(double nCs) TRY
+{
+	solverCast(solver)->getSolverHandler()->setNCsGB(nCs);
+}
+CATCH
+
 TS&
 XolotlInterface::getTS() TRY
 {

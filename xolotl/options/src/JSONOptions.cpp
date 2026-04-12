@@ -454,8 +454,8 @@ JSONOptions::defineHandlers()
 			})
 		.add(
 			"density", ElemType::real,
-			"Sets a density in nm-3 for the number of xenon per volume in a "
-			"bubble for the NE case.\n"
+			"Sets a density in nm-3 for the number of xenon and cesium per volume in a "
+			"bubble for the NE and UO2Cs case.\n"
 			"(default = 10.162795276841)",
 			JSON_ELEM_HANDLER { checkSetParam(tree, name, density); })
 		.add(
@@ -472,7 +472,7 @@ JSONOptions::defineHandlers()
 			JSON_ELEM_HANDLER { checkSetParam(tree, name, latticeParameter); })
 		.add(
 			"impurityRadius", ElemType::real,
-			"The radius of the main impurity (He or Xe) in nm.",
+			"The radius of the main impurity (He or Xe or Cs) in nm.",
 			JSON_ELEM_HANDLER { checkSetParam(tree, name, impurityRadius); })
 		.add(
 			"biasFactor", ElemType::real,
@@ -489,8 +489,12 @@ JSONOptions::defineHandlers()
 			"The diffusion coefficient for xenon in nm2 s-1.",
 			JSON_ELEM_HANDLER { checkSetParam(tree, name, xenonDiffusivity); })
 		.add(
+			"cesiumDiffusivity", ElemType::real,
+			"The diffusion coefficient for cesium in nm2 s-1.",
+			JSON_ELEM_HANDLER { checkSetParam(tree, name, cesiumDiffusivity); })
+		.add(
 			"fissionYield", ElemType::real,
-			"The number of xenon created for each fission.\n"
+			"The number of xenon and cesium created for each fission.\n"
 			"(default = 0.25)",
 			JSON_ELEM_HANDLER { checkSetParam(tree, name, fissionYield); })
 		.add(

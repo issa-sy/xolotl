@@ -563,9 +563,17 @@ public:
 	getXenonDiffusivity() const = 0;
 
 	/**
+	 * Obtain the value of the cesium diffusion coefficient.
+	 *
+	 * @return The diffusivity in nm2 s-1
+	 */
+	virtual double
+	getCesiumDiffusivity() const = 0;
+
+	/**
 	 * Obtain the value of the fission yield.
 	 *
-	 * @return The number of xenon per fission
+	 * @return The number of xenon and cesium per fission
 	 */
 	virtual double
 	getFissionYield() const = 0;
