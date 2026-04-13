@@ -5,6 +5,7 @@
 #include <xolotl/core/network/AlloyReactionNetwork.h>
 #include <xolotl/core/network/FeReactionNetwork.h>
 #include <xolotl/core/network/NEReactionNetwork.h>
+#include <xolotl/core/network/UO2CsReactionNetwork.h>
 #include <xolotl/core/network/ZrReactionNetwork.h>
 #include <xolotl/io/XFile.h>
 #include <xolotl/solver/PetscSolver.h>
@@ -41,7 +42,7 @@ PetscMonitor0D::setup(int loop)
 
 	// Flags to launch the monitors or not
 	PetscBool flagCheck, flag1DPlot, flagBubble, flagStatus, flagAlloy,
-		flagXeRetention, flagLargest, flagZr;
+		flagXeRetention, flagCsRetention, flagLargest, flagZr;
 
 	// Check the option -check_collapse
 	PetscCallVoid(
@@ -64,6 +65,10 @@ PetscMonitor0D::setup(int loop)
 	// Check the option -xenon_retention
 	PetscCallVoid(
 		PetscOptionsHasName(NULL, NULL, "-xenon_retention", &flagXeRetention));
+
+	// Check the option -cesium_retention
+	PetscCallVoid(
+		PetscOptionsHasName(NULL, NULL, "-cesium_retention", &flagCsRetention));
 
 	// Check the option -largest_conc
 	PetscCallVoid(
@@ -109,6 +114,33 @@ PetscMonitor0D::setup(int loop)
 		// Create and set the label provider
 		auto labelProvider = std::make_shared<viz::LabelProvider>();
 		labelProvider->axis1Label = "Xenon Size";
+		labelProvider->axis2Label = "Concentration";
+
+		// Give it to the plot
+		_scatterPlot->setLabelProvider(labelProvider);
+
+		// Create the data provider
+		auto dataProvider =
+			std::make_shared<viz::dataprovider::CvsXDataProvider>();
+
+		// Give it to the plot
+		_scatterPlot->setDataProvider(dataProvider);
+
+		// monitorScatter will be called at each timestep
+		PetscCallVoid(
+			TSMonitorSet(_ts, monitor::monitorScatter, this, nullptr));
+	}
+
+	// set the monitor to save 1D plot of cesium distribution
+	if (flag1DPlot) {
+		// Create a ScatterPlot
+		_scatterPlot = vizHandlerRegistry->getPlot(viz::PlotType::SCATTER);
+
+		//		_scatterPlot->setLogScale();
+
+		// Create and set the label provider
+		auto labelProvider = std::make_shared<viz::LabelProvider>();
+		labelProvider->axis1Label = "Cesium Size";
 		labelProvider->axis2Label = "Concentration";
 
 		// Give it to the plot
@@ -225,6 +257,86 @@ PetscMonitor0D::setup(int loop)
 			tokens = util::Tokenizer<double>{line}();
 		}
 		outputFile << "Xe/SD var R_b var" << std::endl;
+		outputFile.close();
+	}
+
+	// Set the monitor to compute the cesium content
+	if (flagCsRetention) {
+		// Get the previous time if concentrations were stored and initialize
+		// the fluence
+		if (hasConcentrations) {
+			assert(lastTsGroup);
+
+			// Get the previous time from the HDF5 file
+			double previousTime = lastTsGroup->readPreviousTime();
+			_solverHandler->setPreviousTime(previousTime);
+			// Initialize the fluence
+			auto fluxHandler = _solverHandler->getFluxHandler();
+			// Increment the fluence with the value at this current timestep
+			auto fluences = lastTsGroup->readFluence();
+			fluxHandler->setFluence(fluences);
+		}
+
+		// computeCesiumRetention0D will be called at each timestep
+		PetscCallVoid(
+			TSMonitorSet(_ts, monitor::computeCesiumRetention, this, nullptr));
+
+		using NetworkType = core::network::UO2CsReactionNetwork;
+		using Spec = typename NetworkType::Species;
+		using Composition = typename NetworkType::Composition;
+		using Region = typename NetworkType::Region;
+		auto& network =
+			dynamic_cast<NetworkType&>(_solverHandler->getNetwork());
+
+		// Uncomment to clear the file where the retention will be written
+		std::ofstream outputFile;
+		outputFile.open("retentionOut.txt");
+		outputFile << "#time content ";
+
+		std::ifstream reactionFile;
+		reactionFile.open(_solverHandler->getReactionFilePath());
+		// Get the line
+		std::string line;
+		getline(reactionFile, line);
+		// Read the first line
+		std::vector<double> tokens;
+		util::Tokenizer<double>{line}(tokens);
+		// And start looping on the lines
+		while (tokens.size() > 0) {
+			// Find the Id of the cluster
+			IdType nCs = static_cast<IdType>(tokens[0]);
+			IdType nV = static_cast<IdType>(tokens[1]);
+			IdType nI = static_cast<IdType>(tokens[2]);
+			auto comp =
+				std::vector<AmountType>(network.getSpeciesListSize(), 0);
+			auto clusterSpecies = network.parseSpeciesId("Cs");
+			comp[clusterSpecies()] = nCs;
+			clusterSpecies = network.parseSpeciesId("V");
+			comp[clusterSpecies()] = nV;
+			clusterSpecies = network.parseSpeciesId("I");
+			comp[clusterSpecies()] = nI;
+
+			auto clusterId = network.findClusterId(comp);
+			// Check that it is present in the network
+			if (clusterId != NetworkType::invalidIndex()) {
+				_clusterOrder.push_back(clusterId);
+				if (nI > 0)
+					outputFile << "I_" << nI << " ";
+				else if (nV > 0 and nCs == 0)
+					outputFile << "V_" << nV << " ";
+				else if (nCs > 0 and nV == 0)
+					outputFile << "Cs_" << nCs << " ";
+				else
+					outputFile << "Cs_" << nCs << "V_" << nV << " ";
+			}
+
+			getline(reactionFile, line);
+			if (line == "Reactions")
+				break;
+
+			tokens = util::Tokenizer<double>{line}();
+		}
+		outputFile << "Cs/SD var R_b var" << std::endl;
 		outputFile.close();
 	}
 
@@ -456,6 +568,77 @@ PetscMonitor0D::computeXenonRetention(
 }
 
 PetscErrorCode
+PetscMonitor0D::computeCesiumRetention(
+	TS ts, PetscInt timestep, PetscReal time, Vec solution)
+{
+	PetscFunctionBeginUser;
+
+	// Get the da from ts
+	DM da;
+	PetscCall(TSGetDM(ts, &da));
+
+	using NetworkType = core::network::UO2CsReactionNetwork;
+	using Spec = typename NetworkType::Species;
+	using Composition = typename NetworkType::Composition;
+
+	// Degrees of freedom is the total number of clusters in the network
+	auto& network = dynamic_cast<NetworkType&>(_solverHandler->getNetwork());
+
+	// Get the array of concentration
+	PetscOffsetView<const PetscReal**> solutionArray;
+	PetscCall(DMDAVecGetKokkosOffsetViewDOF(da, solution, &solutionArray));
+
+	// Declare the pointer for the concentrations at a specific grid point
+	PetscReal* gridPointSolution;
+	PetscReal** solutionArrayH;
+	PetscCall(DMDAVecGetArrayDOFRead(da, solution, &solutionArrayH));
+	gridPointSolution = solutionArrayH[0];
+
+	// Store the concentration and other values over the grid
+	double csConcentration = 0.0;
+
+	// Get the pointer to the beginning of the solution data for this grid point
+	auto concs = subview(solutionArray, 0, Kokkos::ALL).view();
+
+	// Get the minimum size for the radius
+	auto minSizes = _solverHandler->getMinSizes();
+
+	// Get the concentrations
+	csConcentration = network.getTotalAtomConcentration(concs, Spec::Cs, 1);
+
+	// Print the result
+	XOLOTL_LOG << "\nTime: " << time << '\n'
+			   << "Cesium concentration = " << csConcentration << "\n\n";
+
+	// Uncomment to write the content in a file
+	constexpr double k_B = ::xolotl::core::kBoltzmann;
+	std::ofstream outputFile;
+	outputFile.open("retentionOut.txt", std::ios::app);
+	outputFile << time << " " << csConcentration << " ";
+	for (auto id : _clusterOrder) {
+		outputFile << gridPointSolution[id] << " ";
+	}
+	if (csConcentration < 1.0e-16)
+		outputFile << "0 0 0 0" << std::endl;
+	else {
+		auto ratio = network.getTotalVolumeRatio(concs, Spec::Cs, 2);
+		auto variance =
+			network.getTotalRatioVariance(concs, Spec::Cs, ratio, 2);
+		auto radius = network.getTotalVolumeRadius(concs, Spec::Cs, 2);
+		auto radVar =
+			network.getTotalRadiusVariance(concs, Spec::Cs, radius, 2);
+		outputFile << ratio << " " << variance << " " << radius << " " << radVar
+				   << std::endl;
+	}
+	outputFile.close();
+
+	// Restore the solutionArray
+	PetscCall(DMDAVecRestoreKokkosOffsetViewDOF(da, solution, &solutionArray));
+
+	PetscFunctionReturn(0);
+}
+
+PetscErrorCode
 PetscMonitor0D::computeAlloy(
 	TS ts, PetscInt timestep, PetscReal time, Vec solution)
 {
@@ -552,6 +735,86 @@ PetscMonitor0D::monitorScatter(
 		auto cluster = network.getCluster(i, plsm::HostMemSpace{});
 		const Region& clReg = cluster.getRegion();
 		for (auto j : makeIntervalRange(clReg[Spec::Xe])) {
+			viz::dataprovider::DataPoint aPoint;
+			aPoint.value = gridPointSolution[i];
+			aPoint.t = time;
+			aPoint.x = (double)j;
+			myPoints->push_back(aPoint);
+		}
+	}
+
+	// Get the data provider and give it the points
+	_scatterPlot->getDataProvider()->setDataPoints(myPoints);
+
+	// Change the title of the plot and the name of the data
+	std::stringstream title;
+	title << "Size Distribution";
+	_scatterPlot->getDataProvider()->setDataName(title.str());
+	_scatterPlot->plotLabelProvider->titleLabel = title.str();
+	// Give the time to the label provider
+	std::stringstream timeLabel;
+	timeLabel << "time: " << std::setprecision(4) << time << "s";
+	_scatterPlot->plotLabelProvider->timeLabel = timeLabel.str();
+	// Get the current time step
+	PetscReal currentTimeStep;
+	PetscCall(TSGetTimeStep(ts, &currentTimeStep));
+	// Give the timestep to the label provider
+	std::stringstream timeStepLabel;
+	timeStepLabel << "dt: " << std::setprecision(4) << currentTimeStep << "s";
+	_scatterPlot->plotLabelProvider->timeStepLabel = timeStepLabel.str();
+
+	// Render and save in file
+	std::stringstream fileName;
+	fileName << "Scatter_TS" << timestep << ".png";
+	_scatterPlot->render(fileName.str());
+
+	// Restore the solutionArray
+	PetscCall(DMDAVecRestoreArrayDOFRead(da, solution, &solutionArray));
+
+	PetscFunctionReturn(0);
+}
+
+PetscErrorCode
+PetscMonitor0D::monitorScatter(
+	TS ts, PetscInt timestep, PetscReal time, Vec solution)
+{
+	// Initial declarations
+	double **solutionArray, *gridPointSolution;
+
+	PetscFunctionBeginUser;
+
+	// Don't do anything if it is not on the stride
+	if (timestep % 10 != 0)
+		PetscFunctionReturn(0);
+
+	// Get the da from ts
+	DM da;
+	PetscCall(TSGetDM(ts, &da));
+
+	// Get the solutionArray
+	PetscCall(DMDAVecGetArrayDOFRead(da, solution, &solutionArray));
+
+	// Get the network and its size
+	using NetworkType = core::network::UO2CsReactionNetwork;
+	using Spec = typename NetworkType::Species;
+	using Region = typename NetworkType::Region;
+	auto& network = dynamic_cast<NetworkType&>(_solverHandler->getNetwork());
+	auto networkSize = network.getNumClusters();
+
+	// Create a DataPoint vector to store the data to give to the data provider
+	// for the visualization
+	auto myPoints =
+		std::make_shared<std::vector<viz::dataprovider::DataPoint>>();
+
+	// Get the pointer to the beginning of the solution data for this grid point
+	gridPointSolution = solutionArray[0];
+
+	for (auto i = 0; i < networkSize; i++) {
+		// Create a DataPoint with the concentration[i] as the value
+		// and add it to myPoints
+		auto cluster = network.getCluster(i, plsm::HostMemSpace{});
+		const Region& clReg = cluster.getRegion();
+		for (auto j : makeIntervalRange(clReg[Spec::Cs])) {
 			viz::dataprovider::DataPoint aPoint;
 			aPoint.value = gridPointSolution[i];
 			aPoint.t = time;

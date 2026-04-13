@@ -55,6 +55,7 @@ SolverHandler::SolverHandler(NetworkType& _network,
 	heVRatio(4.0),
 	previousTime(0.0),
 	nXeGB(0.0),
+	nCsGB(0.0),
 	gridType(""),
 	gridFileName(""),
 	gridParam0(0.0),
@@ -772,6 +773,21 @@ SolverHandler::createLocalNE(IdType a, IdType b, IdType c)
 	// Create the vector of vectors and fill it with 0.0
 	for (auto i = 0; i < a; i++) {
 		auto& tempTempVector = localNE.emplace_back();
+		for (auto j = 0; j < b; j++) {
+			auto& tempVector = tempTempVector.emplace_back();
+			for (auto k = 0; k < c; k++) {
+				tempVector.push_back({0.0, 0.0, 0.0, 0.0});
+			}
+		}
+	}
+}
+
+SolverHandler::createLocalUO2Cs(IdType a, IdType b, IdType c)
+{
+	localUO2Cs.clear();
+	// Create the vector of vectors and fill it with 0.0
+	for (auto i = 0; i < a; i++) {
+		auto& tempTempVector = localUO2Cs.emplace_back();
 		for (auto j = 0; j < b; j++) {
 			auto& tempVector = tempTempVector.emplace_back();
 			for (auto k = 0; k < c; k++) {

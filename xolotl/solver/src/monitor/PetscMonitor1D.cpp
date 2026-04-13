@@ -4,6 +4,7 @@
 #include <xolotl/core/network/AlloyReactionNetwork.h>
 #include <xolotl/core/network/IPSIReactionNetwork.h>
 #include <xolotl/core/network/NEReactionNetwork.h>
+#include <xolotl/core/network/UO2CsReactionNetwork.h>
 #include <xolotl/core/network/ZrReactionNetwork.h>
 #include <xolotl/io/XFile.h>
 #include <xolotl/perf/ScopedTimer.h>
@@ -75,6 +76,7 @@ PetscMonitor1D::setup(int loop)
 	_startStopTimer = perfHandler->getTimer("monitor1D:startStop");
 	_heRetentionTimer = perfHandler->getTimer("monitor1D:heRet");
 	_xeRetentionTimer = perfHandler->getTimer("monitor1D:xeRet");
+	_csRetentionTimer = perfHandler->getTimer("monitor1D:csRet");
 	_scatterTimer = perfHandler->getTimer("monitor1D:scatter");
 	_seriesTimer = perfHandler->getTimer("monitor1D:series");
 	_eventFuncTimer = perfHandler->getTimer("monitor1D:event");
@@ -90,8 +92,8 @@ PetscMonitor1D::setup(int loop)
 
 	// Flags to launch the monitors or not
 	PetscBool flagNeg, flagCollapse, flag2DPlot, flag1DPlot, flagSeries,
-		flagPerf, flagHeRetention, flagStatus, flagXeRetention, flagTRIDYN,
-		flagAlloy, flagTemp, flagLargest, flagZr;
+		flagPerf, flagHeRetention, flagStatus, flagXeRetention, flagCsRetention,
+		flagTRIDYN, flagAlloy, flagTemp, flagLargest, flagZr;
 
 	// Check the option -check_negative
 	PetscCallVoid(PetscOptionsHasName(NULL, NULL, "-check_negative", &flagNeg));
@@ -119,6 +121,10 @@ PetscMonitor1D::setup(int loop)
 	// Check the option -xenon_retention
 	PetscCallVoid(
 		PetscOptionsHasName(NULL, NULL, "-xenon_retention", &flagXeRetention));
+
+	// Check the option -cs_retention
+	PetscCallVoid(
+		PetscOptionsHasName(NULL, NULL, "-cs_retention", &flagCsRetention));
 
 	// Check the option -start_stop
 	PetscCallVoid(PetscOptionsHasName(NULL, NULL, "-start_stop", &flagStatus));
@@ -292,7 +298,38 @@ PetscMonitor1D::setup(int loop)
 		}
 	}
 
-	// Set the monitor to save 1D plot of xenon distribution
+	// Set the monitor to save 1D plot of cesium distribution
+	if (flag1DPlot) {
+		// Only the master process will create the plot
+		if (procId == 0) {
+			// Create a ScatterPlot
+			_scatterPlot = vizHandlerRegistry->getPlot(viz::PlotType::SCATTER);
+
+			_scatterPlot->setLogScale();
+
+			// Create and set the label provider
+			auto labelProvider = std::make_shared<viz::LabelProvider>();
+			labelProvider->axis1Label = "Cesium Size";
+			labelProvider->axis2Label = "Concentration";
+
+			// Give it to the plot
+			_scatterPlot->setLabelProvider(labelProvider);
+
+			// Create the data provider
+			auto dataProvider =
+				std::make_shared<viz::dataprovider::CvsXDataProvider>();
+
+			// Give it to the plot
+			_scatterPlot->setDataProvider(dataProvider);
+		}
+
+		// monitorScatter1D will be called at each timestep
+		PetscCallVoid(
+			TSMonitorSet(_ts, monitor::monitorScatter, this, nullptr));
+	}
+
+
+		// Set the monitor to save 1D plot of xenon distribution
 	if (flag1DPlot) {
 		// Only the master process will create the plot
 		if (procId == 0) {
@@ -321,7 +358,7 @@ PetscMonitor1D::setup(int loop)
 		PetscCallVoid(
 			TSMonitorSet(_ts, monitor::monitorScatter, this, nullptr));
 	}
-
+	
 	// Set the monitor to save 1D plot of many concentrations
 	if (flagSeries) {
 		// Only the master process will create the plot
@@ -568,6 +605,51 @@ PetscMonitor1D::setup(int loop)
 			std::ofstream outputFile;
 			outputFile.open("retentionOut.txt");
 			outputFile << "#time Xenon_content radius partial_radius "
+						  "partial_bubble_conc partial_size"
+					   << std::endl;
+			outputFile.close();
+		}
+	}
+
+if (flagCsRetention) {
+		// Get the da from _ts
+		DM da;
+		PetscCallVoid(TSGetDM(_ts, &da));
+		// Get the local boundaries
+		PetscInt xm;
+		PetscCallVoid(DMDAGetCorners(da, NULL, NULL, NULL, &xm, NULL, NULL));
+		// Create the local vectors on each process
+		_solverHandler->createLocalUO2Cs(xm);
+
+		// Get the previous time if concentrations were stored and initialize
+		// the fluence
+		if (hasConcentrations and _loopNumber == 0) {
+			assert(lastTsGroup);
+
+			// Get the previous time from the HDF5 file
+			double previousTime = lastTsGroup->readPreviousTime();
+			_solverHandler->setPreviousTime(previousTime);
+			// Initialize the fluence
+			auto fluxHandler = _solverHandler->getFluxHandler();
+			// Increment the fluence with the value at this current timestep
+			auto fluences = lastTsGroup->readFluence();
+			fluxHandler->setFluence(fluences);
+		}
+
+		// computeFluence will be called at each timestep
+		PetscCallVoid(
+			TSMonitorSet(_ts, monitor::computeFluence, this, nullptr));
+
+		// computeCesiumRetention1D will be called at each timestep
+		PetscCallVoid(
+			TSMonitorSet(_ts, monitor::computeCesiumRetention, this, nullptr));
+
+		// Master process
+		if (procId == 0 and _loopNumber == 0) {
+			// Uncomment to clear the file where the retention will be written
+			std::ofstream outputFile;
+			outputFile.open("retentionOut.txt");
+			outputFile << "#time Cesium_content radius partial_radius "
 						  "partial_bubble_conc partial_size"
 					   << std::endl;
 			outputFile.close();
@@ -1375,6 +1457,237 @@ PetscMonitor1D::computeXenonRetention(
 }
 
 PetscErrorCode
+PetscMonitor1D::computeCesiumRetention(
+	TS ts, PetscInt timestep, PetscReal time, Vec solution)
+{
+	// Initial declarations
+	IdType xs, xm, Mx, ys, ym, My, zs, zm, Mz;
+
+	PetscFunctionBeginUser;
+
+	perf::ScopedTimer myTimer(_csRetentionTimer);
+
+	// Get the da from ts
+	DM da;
+	PetscCall(TSGetDM(ts, &da));
+
+	// Get local coordinates
+	_solverHandler->getLocalCoordinates(xs, xm, Mx, ys, ym, My, zs, zm, Mz);
+
+	// Get the physical grid
+	auto grid = _solverHandler->getXGrid();
+
+	using NetworkType = core::network::UO2CsReactionNetwork;
+	using Spec = typename NetworkType::Species;
+	using Composition = typename NetworkType::Composition;
+
+	// Degrees of freedom is the total number of clusters in the network
+	auto& network = dynamic_cast<NetworkType&>(_solverHandler->getNetwork());
+	const auto dof = network.getDOF();
+
+	// Get the complete data array, including ghost cells
+	Vec localSolution;
+	PetscCall(DMGetLocalVector(da, &localSolution));
+	PetscCall(DMGlobalToLocalBegin(da, solution, INSERT_VALUES, localSolution));
+	PetscCall(DMGlobalToLocalEnd(da, solution, INSERT_VALUES, localSolution));
+	// Get the array of concentration
+	PetscReal** solutionArray;
+	PetscCall(DMDAVecGetArrayDOFRead(da, localSolution, &solutionArray));
+
+	// Store the concentration and other values over the grid
+	double csConcentration = 0.0, bubbleConcentration = 0.0, radii = 0.0,
+		   partialBubbleConcentration = 0.0, partialRadii = 0.0,
+		   partialSize = 0.0;
+
+	// Declare the pointer for the concentrations at a specific grid point
+	PetscReal* gridPointSolution;
+
+	// Get the minimum size for the radius
+	auto minSizes = _solverHandler->getMinSizes();
+
+	// Get Cs_1
+	Composition csComp = Composition::zero();
+	csComp[Spec::Cs] = 1;
+	auto csCluster = network.findCluster(csComp, plsm::HostMemSpace{});
+
+	// Loop on the grid
+	for (auto xi = xs; xi < xs + xm; xi++) {
+		// Get the pointer to the beginning of the solution data for this grid
+		// point
+		gridPointSolution = solutionArray[xi];
+
+		using HostUnmanaged =
+			Kokkos::View<double*, Kokkos::HostSpace, Kokkos::MemoryUnmanaged>;
+		auto hConcs = HostUnmanaged(gridPointSolution, dof);
+		auto dConcs = Kokkos::View<double*>("Concentrations", dof);
+		deep_copy(dConcs, hConcs);
+
+		// Initialize the volume fraction and hx
+		double hx = grid[xi + 1] - grid[xi];
+
+		// Get the concentrations
+		using TQ = core::network::IReactionNetwork::TotalQuantity;
+		using Q = TQ::Type;
+		using TQA = util::Array<TQ, 7>;
+		auto id =
+			core::network::SpeciesId(Spec::Cs, network.getSpeciesListSize());
+		auto ms = static_cast<AmountType>(minSizes[id()]);
+		auto totals = network.getTotals(dConcs,
+			TQA{TQ{Q::total, id, 1}, TQ{Q::atom, id, 1}, TQ{Q::radius, id, 1},
+				TQ{Q::total, id, ms}, TQ{Q::atom, id, ms},
+				TQ{Q::radius, id, ms}, TQ{Q::volume, id, ms}});
+
+		bubbleConcentration += totals[0] * hx;
+		csConcentration += totals[1] * hx;
+		radii += totals[2] * hx;
+		partialBubbleConcentration += totals[3] * hx;
+		partialSize += totals[4] * hx;
+		partialRadii += totals[5] * hx;
+
+		_solverHandler->setVolumeFraction(totals[6], xi - xs);
+
+		_solverHandler->setMonomerConc(
+			gridPointSolution[csCluster.getId()], xi - xs);
+	}
+
+	// Get the current process ID
+	auto xolotlComm = util::getMPIComm();
+	int procId;
+	MPI_Comm_rank(xolotlComm, &procId);
+
+	// Sum all the concentrations through MPI reduce
+	std::array<double, 6> myConcData{csConcentration, bubbleConcentration,
+		radii, partialBubbleConcentration, partialRadii, partialSize};
+	std::array<double, 6> totalConcData{0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+	MPI_Reduce(myConcData.data(), totalConcData.data(), myConcData.size(),
+		MPI_DOUBLE, MPI_SUM, 0, xolotlComm);
+
+	// GB
+	// Get the delta time from the previous timestep to this timestep
+	double dt = time - _solverHandler->getPreviousTime();
+	// Sum and gather the previous flux
+	double globalCsFlux = 0.0;
+	// Get the vector from the solver handler
+	auto gbVector = _solverHandler->getGBVector();
+	// Get the previous flux vector
+	auto& localUO2Cs = _solverHandler->getLocalUO2Cs();
+	// Loop on the GB
+	for (auto const& pair : gbVector) {
+		// Middle
+		auto xi = std::get<0>(pair);
+		// Check we are on the right proc
+		if (xi >= xs && xi < xs + xm) {
+			double previousCsFlux = std::get<1>(localUO2Cs[xi - xs][0][0]);
+			globalCsFlux += previousCsFlux * (grid[xi + 1] - grid[xi]);
+			// Set the amount in the vector we keep
+			_solverHandler->setLocalCsRate(previousCsFlux * dt, xi - xs);
+		}
+	}
+	double totalCsFlux = 0.0;
+	MPI_Reduce(
+		&globalCsFlux, &totalCsFlux, 1, MPI_DOUBLE, MPI_SUM, 0, xolotlComm);
+	// Master process
+	if (procId == 0) {
+		// Get the previous value of Cs that went to the GB
+		double nCesium = _solverHandler->getNCsGB();
+		// Compute the total number of Cs that went to the GB
+		nCesium += totalCsFlux * dt;
+		_solverHandler->setNCsGB(nCesium);
+	}
+
+	// Get the number of species
+	auto numSpecies = network.getSpeciesListSize();
+
+	// Get the vector of diffusing clusters
+	auto diffusionHandler = _solverHandler->getDiffusionHandler();
+	auto diffusingIds = diffusionHandler->getDiffusingIds();
+
+	// Loop on the GB
+	for (auto const& pair : gbVector) {
+		// Local rate
+		auto myRate = std::vector<double>(numSpecies, 0.0);
+		// Define left and right with reference to the middle point
+		// Middle
+		auto xi = std::get<0>(pair);
+
+		// Factor for finite difference
+		double hxLeft = 0.0, hxRight = 0.0;
+		if (xi >= 1 && xi < Mx) {
+			hxLeft = (grid[xi + 1] - grid[xi - 1]) / 2.0;
+			hxRight = (grid[xi + 2] - grid[xi]) / 2.0;
+		}
+		else if (xi < 1) {
+			hxLeft = grid[xi + 1] - grid[xi];
+			hxRight = (grid[xi + 2] - grid[xi]) / 2.0;
+		}
+		else {
+			hxLeft = (grid[xi + 1] - grid[xi - 1]) / 2.0;
+			hxRight = grid[xi + 1] - grid[xi];
+		}
+		double factor = 2.0 / (hxLeft + hxRight);
+		// Check we are on the right proc
+		if (xi >= xs && xi < xs + xm) {
+			// Left
+			xi = std::get<0>(pair) - 1;
+			// Get the pointer to the beginning of the solution data for this
+			// grid point
+			gridPointSolution = solutionArray[xi];
+			// Compute the flux coming from the left
+			network.updateOutgoingDiffFluxes(gridPointSolution, factor / hxLeft,
+				diffusingIds, myRate, xi + 1 - xs);
+
+			// Right
+			xi = std::get<0>(pair) + 1;
+			gridPointSolution = solutionArray[xi];
+			// Compute the flux coming from the right
+			network.updateOutgoingDiffFluxes(gridPointSolution,
+				factor / hxRight, diffusingIds, myRate, xi + 1 - xs);
+
+			// Middle
+			xi = std::get<0>(pair);
+			_solverHandler->setPreviousCsFlux(myRate[0], xi - xs);
+		}
+	}
+
+	// Master process
+	if (procId == 0) {
+		// Get the number of cesium that went to the GB
+		double nCesium = _solverHandler->getNCsGB();
+
+		// Print the result
+		XOLOTL_LOG << std::endl
+				   << "Time: " << time << std::endl
+				   << "Cesium concentration = " << totalConcData[0] << std::endl
+				   << "Cesium GB = " << nCesium << std::endl
+				   << std::endl;
+
+		// Make sure the average partial radius makes sense
+		double averagePartialRadius = 0.0, averagePartialSize = 0.0,
+			   averageRadius = 0.0;
+		if (totalConcData[3] > 1.e-16) {
+			averagePartialRadius = totalConcData[4] / totalConcData[3];
+			averagePartialSize = totalConcData[5] / totalConcData[3];
+		}
+		if (totalConcData[1] > 1.0e-16)
+			averageRadius = totalConcData[2] / totalConcData[1];
+
+		// Uncomment to write the content in a file
+		std::ofstream outputFile;
+		outputFile.open("retentionOut.txt", std::ios::app);
+		outputFile << time << " " << totalConcData[0] << " " << averageRadius
+				   << " " << averagePartialRadius << " " << totalConcData[3]
+				   << " " << averagePartialSize << std::endl;
+		outputFile.close();
+	}
+
+	// Restore the solutionArray
+	PetscCall(DMDAVecRestoreArrayDOFRead(da, localSolution, &solutionArray));
+	PetscCall(DMRestoreLocalVector(da, &localSolution));
+
+	PetscFunctionReturn(0);
+}
+
+PetscErrorCode
 PetscMonitor1D::computeAlloy(
 	TS ts, PetscInt timestep, PetscReal time, Vec solution)
 {
@@ -1555,6 +1868,105 @@ PetscMonitor1D::monitorScatter(
 			auto cluster = network.getCluster(i, plsm::HostMemSpace{});
 			const Region& clReg = cluster.getRegion();
 			for (auto j : makeIntervalRange(clReg[Spec::Xe])) {
+				viz::dataprovider::DataPoint aPoint;
+				aPoint.value = gridPointSolution[i];
+				aPoint.t = time;
+				aPoint.x = (double)j;
+				myPoints->push_back(aPoint);
+			}
+		}
+
+		// Get the data provider and give it the points
+		_scatterPlot->getDataProvider()->setDataPoints(myPoints);
+
+		// Change the title of the plot and the name of the data
+		std::stringstream title;
+		title << "Size Distribution";
+		_scatterPlot->getDataProvider()->setDataName(title.str());
+		_scatterPlot->plotLabelProvider->titleLabel = title.str();
+		// Give the time to the label provider
+		std::stringstream timeLabel;
+		timeLabel << "time: " << std::setprecision(4) << time << "s";
+		_scatterPlot->plotLabelProvider->timeLabel = timeLabel.str();
+		// Get the current time step
+		PetscReal currentTimeStep;
+		PetscCall(TSGetTimeStep(ts, &currentTimeStep));
+		// Give the timestep to the label provider
+		std::stringstream timeStepLabel;
+		timeStepLabel << "dt: " << std::setprecision(4) << currentTimeStep
+					  << "s";
+		_scatterPlot->plotLabelProvider->timeStepLabel = timeStepLabel.str();
+
+		// Render and save in file
+		std::stringstream fileName;
+		fileName << "Scatter_TS" << timestep << ".png";
+		_scatterPlot->render(fileName.str());
+	}
+
+	// Restore the solutionArray
+	PetscCall(DMDAVecRestoreArrayDOFRead(da, solution, &solutionArray));
+
+	PetscFunctionReturn(0);
+}
+
+PetscErrorCode
+PetscMonitor1D::monitorScatter(
+	TS ts, PetscInt timestep, PetscReal time, Vec solution)
+{
+	// Initial declarations
+	double **solutionArray, *gridPointSolution;
+	IdType xs, xm, Mx, ys, ym, My, zs, zm, Mz;
+
+	PetscFunctionBeginUser;
+
+	perf::ScopedTimer myTimer(_scatterTimer);
+
+	// Don't do anything if it is not on the stride
+	if (timestep % 200 != 0)
+		PetscFunctionReturn(0);
+
+	// Gets the process ID (important when it is running in parallel)
+	auto xolotlComm = util::getMPIComm();
+	int procId;
+	MPI_Comm_rank(xolotlComm, &procId);
+
+	// Get the da from ts
+	DM da;
+	PetscCall(TSGetDM(ts, &da));
+
+	// Get the solutionArray
+	PetscCall(DMDAVecGetArrayDOFRead(da, solution, &solutionArray));
+
+	// Get local coordinates
+	_solverHandler->getLocalCoordinates(xs, xm, Mx, ys, ym, My, zs, zm, Mz);
+
+	// Get the network and its size
+	using NetworkType = core::network::UO2CsReactionNetwork;
+	using Spec = typename NetworkType::Species;
+	using Region = typename NetworkType::Region;
+	auto& network = dynamic_cast<NetworkType&>(_solverHandler->getNetwork());
+	auto networkSize = network.getNumClusters();
+
+	// Get the index of the middle of the grid
+	auto ix = Mx / 2;
+
+	// If the middle is on this process
+	if (ix >= xs && ix < xs + xm) {
+		// Create a DataPoint vector to store the data to give to the data
+		// provider for the visualization
+		auto myPoints =
+			std::make_shared<std::vector<viz::dataprovider::DataPoint>>();
+
+		// Get the pointer to the beginning of the solution data for this grid
+		// point
+		gridPointSolution = solutionArray[ix];
+
+		for (auto i = 0; i < networkSize; i++) {
+			// Create a Point with the concentration[i] as the value
+			// and add it to myPoints
+			auto cluster = network.getCluster(i, plsm::HostMemSpace{});
+			const Region& clReg = cluster.getRegion();
+			for (auto j : makeIntervalRange(clReg[Spec::Cs])) {
 				viz::dataprovider::DataPoint aPoint;
 				aPoint.value = gridPointSolution[i];
 				aPoint.t = time;

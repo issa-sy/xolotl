@@ -5,6 +5,7 @@
 #include <xolotl/core/Types.h>
 #include <xolotl/core/network/IPSIReactionNetwork.h>
 #include <xolotl/core/network/NEReactionNetwork.h>
+#include <xolotl/core/network/UO2CsReactionNetwork.h>
 #include <xolotl/io/XFile.h>
 #include <xolotl/solver/handler/PetscSolver3DHandler.h>
 #include <xolotl/util/Log.h>
@@ -704,6 +705,11 @@ PetscSolver3DHandler::initGBLocation(DM& da, Vec& C)
 	using Spec = typename NetworkType::Species;
 	auto& neNetwork = dynamic_cast<NetworkType&>(network);
 
+	// Need to use the UO2Cs network here
+	using NetworkType = core::network::UO2CsReactionNetwork;
+	using Spec = typename NetworkType::Species;
+	auto& uo2csNetwork = dynamic_cast<NetworkType&>(network);
+
 	// Loop on the GB
 	for (auto const& pair : gbVector) {
 		// Get the coordinate of the point
@@ -725,6 +731,11 @@ PetscSolver3DHandler::initGBLocation(DM& da, Vec& C)
 			// Transfer the local amount of Xe clusters
 			setLocalXeRate(
 				neNetwork.getTotalAtomConcentration(dConcs, Spec::Xe, 1),
+				xi - localXS, yj - localYS, zk - localZS);
+
+			// Transfer the local amount of Cs clusters
+			setLocalCsRate(
+				uo2csNetwork.getTotalAtomConcentration(dConcs, Spec::Cs, 1),
 				xi - localXS, yj - localYS, zk - localZS);
 
 			// Loop on all the clusters to initialize at 0.0

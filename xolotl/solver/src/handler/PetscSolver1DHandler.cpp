@@ -5,6 +5,7 @@
 #include <xolotl/core/Types.h>
 #include <xolotl/core/network/IPSIReactionNetwork.h>
 #include <xolotl/core/network/NEReactionNetwork.h>
+#include <xolotl/core/network/UO2CsReactionNetwork.h>
 #include <xolotl/io/XFile.h>
 #include <xolotl/solver/handler/PetscSolver1DHandler.h>
 #include <xolotl/util/Log.h>
@@ -594,6 +595,13 @@ PetscSolver1DHandler::initGBLocation(DM& da, Vec& C)
 		return;
 	}
 
+	// Need to use the UO2Cs network here
+	using NetworkType = core::network::UO2CsReactionNetwork;
+	auto uo2csNetwork = dynamic_cast<NetworkType*>(&network);
+	if (!uo2csNetwork) {
+		return;
+	}
+
 	// Pointer for the concentration vector
 	PetscScalar** concentrations = nullptr;
 	PetscCallVoid(DMDAVecGetArrayDOF(da, C, &concentrations));
@@ -621,6 +629,11 @@ PetscSolver1DHandler::initGBLocation(DM& da, Vec& C)
 			// Transfer the local amount of Xe clusters
 			setLocalXeRate(
 				neNetwork->getTotalAtomConcentration(dConcs, Spec::Xe, 1),
+				xi - localXS);
+
+			// Transfer the local amount of Cs clusters
+			setLocalCsRate(
+				uo2csNetwork->getTotalAtomConcentration(dConcs, Spec::Cs, 1),
 				xi - localXS);
 
 			// Loop on all the clusters to initialize at 0.0
