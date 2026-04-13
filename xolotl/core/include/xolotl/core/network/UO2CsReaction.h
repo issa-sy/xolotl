@@ -87,16 +87,6 @@ class UO2CsDissociationReaction :
 {
 	friend class Reaction<UO2CsReactionNetwork, UO2CsDissociationReaction>;
 
-	void
-	computeReducedPartialDerivatives(ConcentrationsView concentrations,
-		Kokkos::View<double*> values, IndexType gridIndex);
-};
-
-class UO2CsDissociationReaction :
-	public DissociationReaction<UO2CsReactionNetwork, UO2CsDissociationReaction>
-{
-	friend class Reaction<UO2CsReactionNetwork, UO2CsDissociationReaction>;
-
 public:
 	using Superclass =
 		DissociationReaction<UO2CsReactionNetwork, UO2CsDissociationReaction>;

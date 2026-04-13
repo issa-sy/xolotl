@@ -9,12 +9,12 @@ namespace network
 {
 namespace detail
 {
-auto neNetworkHandlerRegistrations =
+auto uo2csNetworkHandlerRegistrations =
 	xolotl::factory::network::NetworkHandlerFactory::RegistrationCollection<
-		UO2CsNetworkHandler>({"UO2Cs"});
+		UO2CsNetworkHandler>({"Fuel"});
 }
 
-auto neNetworkGenerator = [](const options::IOptions& options) {
+auto uo2csNetworkGenerator = [](const options::IOptions& options) {
 	using NetworkType = core::network::UO2CsReactionNetwork;
 
 	// Get the boundaries from the options
@@ -53,7 +53,7 @@ auto neNetworkGenerator = [](const options::IOptions& options) {
 };
 
 UO2CsNetworkHandler::UO2CsNetworkHandler(const options::IOptions& options) :
-	NetworkHandler(options, neNetworkGenerator)
+	NetworkHandler(options, uo2csNetworkGenerator)
 {
 }
 } // namespace network

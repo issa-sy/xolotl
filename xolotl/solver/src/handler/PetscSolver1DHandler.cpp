@@ -583,6 +583,7 @@ PetscSolver1DHandler::initializeConcentration(
 
 	return;
 }
+/** 
 
 void
 PetscSolver1DHandler::initGBLocation(DM& da, Vec& C)
@@ -592,13 +593,6 @@ PetscSolver1DHandler::initGBLocation(DM& da, Vec& C)
 	using Spec = typename NetworkType::Species;
 	auto neNetwork = dynamic_cast<NetworkType*>(&network);
 	if (!neNetwork) {
-		return;
-	}
-
-	// Need to use the UO2Cs network here
-	using NetworkType = core::network::UO2CsReactionNetwork;
-	auto uo2csNetwork = dynamic_cast<NetworkType*>(&network);
-	if (!uo2csNetwork) {
 		return;
 	}
 
@@ -631,12 +625,72 @@ PetscSolver1DHandler::initGBLocation(DM& da, Vec& C)
 				neNetwork->getTotalAtomConcentration(dConcs, Spec::Xe, 1),
 				xi - localXS);
 
-			// Transfer the local amount of Cs clusters
-			setLocalCsRate(
-				uo2csNetwork->getTotalAtomConcentration(dConcs, Spec::Cs, 1),
-				xi - localXS);
-
 			// Loop on all the clusters to initialize at 0.0
+			for (auto n = 0; n < dof; n++) {
+				concOffset[n] = 0.0;
+			}
+		}
+	}
+
+	/*
+	 Restore vectors
+	 
+	PetscCallVoid(DMDAVecRestoreArrayDOF(da, C, &concentrations));
+
+	return;
+}
+*/
+
+void
+PetscSolver1DHandler::initGBLocation(DM& da, Vec& C)
+{
+	// Need to use the network here
+	using NEType = core::network::NEReactionNetwork;
+	using UO2CsType = core::network::UO2CsReactionNetwork;
+
+	auto neNetwork = dynamic_cast<NEType*>(&network);
+	auto uo2csNetwork = dynamic_cast<UO2CsType*>(&network);
+
+	// Pointer for the concentration vector
+	PetscScalar** concentrations = nullptr;
+	PetscCallVoid(DMDAVecGetArrayDOF(da, C, &concentrations));
+
+	// Pointer for the concentration vector at a specific grid point
+	PetscScalar* concOffset = nullptr;
+
+	// Degrees of freedom
+	const auto dof = network.getDOF();
+
+	// Loop on the GB
+	for (auto const& pair : gbVector) {
+
+		auto xi = std::get<0>(pair);
+
+		if (xi >= localXS && xi < localXS + localXM) {
+
+			concOffset = concentrations[xi];
+
+			auto hConcs = HostUnmanaged(concOffset, dof);
+			auto dConcs = Kokkos::View<double*>("Concentrations", dof);
+			deep_copy(dConcs, hConcs);
+
+			// NE case
+			if (neNetwork) {
+
+				setLocalXeRate(
+					neNetwork->getTotalAtomConcentration(dConcs, NEType::Species::Xe, 1),
+					xi - localXS);
+			}
+
+			// Cs case
+			if (uo2csNetwork) {
+
+				setLocalCsRate(
+					uo2csNetwork->getTotalAtomConcentration(dConcs, UO2CsType::Species::Cs, 1),
+					xi - localXS);
+			}
+
+			// reset concentrations
 			for (auto n = 0; n < dof; n++) {
 				concOffset[n] = 0.0;
 			}

@@ -49,8 +49,6 @@ public:
 	template <typename PlsmContext>
 	KOKKOS_INLINE_FUNCTION
 	double
-	getDissociationEnergy(const Cluster<PlsmContext>& cluster) const noexcept;
-	double
 	getDiffusionFactor(const Cluster<PlsmContext>& cluster,
 		double latticeParameter) const noexcept;
 

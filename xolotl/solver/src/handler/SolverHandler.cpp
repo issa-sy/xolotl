@@ -782,6 +782,7 @@ SolverHandler::createLocalNE(IdType a, IdType b, IdType c)
 	}
 }
 
+void
 SolverHandler::createLocalUO2Cs(IdType a, IdType b, IdType c)
 {
 	localUO2Cs.clear();
