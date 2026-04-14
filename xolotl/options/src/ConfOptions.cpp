@@ -111,7 +111,7 @@ ConfOptions::readParams(int argc, const char* argv[])
 		"Number of dimensions for the simulation.")("material",
 		bpo::value<std::string>(&materialName),
 		"The material options are as follows: {W100, W110, W111, "
-		"W211, Pulsed, Fuel, Fe, 800H, AlphaZr}.")("initialConc",
+		"W211, Pulsed, Fuel, UO2Cs, Fe, 800H, AlphaZr}.")("initialConc",
 		bpo::value<std::string>(&initialConcentration),
 		"The name, size, and value of the initial concentration in the "
 		"material.")("zeta", bpo::value<double>(&zeta)->default_value(0.73),

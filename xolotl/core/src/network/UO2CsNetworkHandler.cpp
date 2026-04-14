@@ -11,7 +11,7 @@ namespace detail
 {
 auto uo2csNetworkHandlerRegistrations =
 	xolotl::factory::network::NetworkHandlerFactory::RegistrationCollection<
-		UO2CsNetworkHandler>({"Fuel"});
+		UO2CsNetworkHandler>({"UO2Cs"});
 }
 
 auto uo2csNetworkGenerator = [](const options::IOptions& options) {
