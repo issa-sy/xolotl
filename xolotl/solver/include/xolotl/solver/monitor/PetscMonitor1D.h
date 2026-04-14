@@ -126,6 +126,7 @@ protected:
 	std::shared_ptr<perf::ITimer> _tridynTimer;
 	std::shared_ptr<perf::ITimer> _heRetentionTimer;
 	std::shared_ptr<perf::ITimer> _xeRetentionTimer;
+	std::shared_ptr<perf::ITimer> _csRetentionTimer;
 	std::shared_ptr<perf::ITimer> _scatterTimer;
 	std::shared_ptr<perf::ITimer> _seriesTimer;
 	std::shared_ptr<perf::ITimer> _eventFuncTimer;

@@ -44,8 +44,8 @@ PetscMonitor2D::setup(int loop)
 	auto vizHandlerRegistry = _solverHandler->getVizHandler();
 
 	// Flags to launch the monitors or not
-	PetscBool flagCheck, flagPerf, flagHeRetention, flagXeRetention, flagStatus,
-		flag2DPlot, flagLargest;
+	PetscBool flagCheck, flagPerf, flagHeRetention, flagXeRetention, flagCsRetention,
+		flagStatus, flag2DPlot, flagLargest;
 
 	// Check the option -check_collapse
 	PetscCallVoid(
