@@ -1910,6 +1910,7 @@ PetscMonitor1D::monitorScatter(
 	PetscFunctionReturn(0);
 }
 */
+
 PetscErrorCode
 PetscMonitor1D::monitorScatter(
     TS ts, PetscInt timestep, PetscReal time, Vec solution)
@@ -1926,6 +1927,11 @@ PetscMonitor1D::monitorScatter(
     if (timestep % 200 != 0)
         PetscFunctionReturn(0);
 
+    // Gets the process ID (important when it is running in parallel)
+    auto xolotlComm = util::getMPIComm();
+    int procId;
+    MPI_Comm_rank(xolotlComm, &procId);
+
     // Get the da from ts
     DM da;
     PetscCall(TSGetDM(ts, &da));
@@ -1936,105 +1942,105 @@ PetscMonitor1D::monitorScatter(
     // Get local coordinates
     _solverHandler->getLocalCoordinates(xs, xm, Mx, ys, ym, My, zs, zm, Mz);
 
-    // Get the middle of the grid
+    // Get the network
+    auto& baseNetwork = _solverHandler->getNetwork();
+
+    // Get the index of the middle of the grid
     auto ix = Mx / 2;
 
-    // If the middle is not on this process, exit
-    if (ix < xs || ix >= xs + xm) {
-        PetscCall(DMDAVecRestoreArrayDOFRead(da, solution, &solutionArray));
-        PetscFunctionReturn(0);
-    }
+    // If the middle is on this process
+    if (ix >= xs && ix < xs + xm) {
+        // Create a DataPoint vector to store the data to give to the data
+        // provider for the visualization
+        auto myPoints =
+            std::make_shared<std::vector<viz::dataprovider::DataPoint>>();
 
-    // Get the solution at the middle grid point
-    gridPointSolution = solutionArray[ix];
+        // Get the pointer to the beginning of the solution data for this grid
+        // point
+        gridPointSolution = solutionArray[ix];
 
-    // Create a DataPoint vector
-    auto myPoints =
-        std::make_shared<std::vector<viz::dataprovider::DataPoint>>();
+        // Xe network case
+        if (auto* xeNetwork =
+                dynamic_cast<core::network::NEReactionNetwork*>(&baseNetwork)) {
 
-    // =========================================================
-    // CASE 1: Xe simulation (NEReactionNetwork)
-    // =========================================================
-    if (auto* neNetwork =
-            dynamic_cast<core::network::NEReactionNetwork*>(
-                &_solverHandler->getNetwork())) {
+            using NetworkType = core::network::NEReactionNetwork;
+            using Spec = typename NetworkType::Species;
+            using Region = typename NetworkType::Region;
 
-        using Spec = core::network::NEReactionNetwork::Species;
-        using Region = core::network::NEReactionNetwork::Region;
+            auto networkSize = xeNetwork->getNumClusters();
 
-        auto networkSize = neNetwork->getNumClusters();
+            for (auto i = 0; i < networkSize; i++) {
+                // Create a Point with the concentration[i] as the value
+                // and add it to myPoints
+                auto cluster =
+                    xeNetwork->getCluster(i, plsm::HostMemSpace{});
+                const Region& clReg = cluster.getRegion();
 
-        for (auto i = 0; i < networkSize; i++) {
-            auto cluster =
-                neNetwork->getCluster(i, plsm::HostMemSpace{});
-            const Region& clReg = cluster.getRegion();
-
-            for (auto j : makeIntervalRange(clReg[Spec::Xe])) {
-                viz::dataprovider::DataPoint aPoint;
-                aPoint.value = gridPointSolution[i];
-                aPoint.t = time;
-                aPoint.x = (double)j;
-                myPoints->push_back(aPoint);
+                for (auto j : makeIntervalRange(clReg[Spec::Xe])) {
+                    viz::dataprovider::DataPoint aPoint;
+                    aPoint.value = gridPointSolution[i];
+                    aPoint.t = time;
+                    aPoint.x = (double)j;
+                    myPoints->push_back(aPoint);
+                }
             }
         }
-    }
 
-    // =========================================================
-    // CASE 2: Cs simulation (UO2CsReactionNetwork)
-    // =========================================================
-    else if (auto* csNetwork =
-                 dynamic_cast<core::network::UO2CsReactionNetwork*>(
-                     &_solverHandler->getNetwork())) {
+        // Cs network case
+        else if (auto* csNetwork =
+                dynamic_cast<core::network::UO2CsReactionNetwork*>(&baseNetwork)) {
 
-        using Spec = core::network::UO2CsReactionNetwork::Species;
-        using Region = core::network::UO2CsReactionNetwork::Region;
+            using NetworkType = core::network::UO2CsReactionNetwork;
+            using Spec = typename NetworkType::Species;
+            using Region = typename NetworkType::Region;
 
-        auto networkSize = csNetwork->getNumClusters();
+            auto networkSize = csNetwork->getNumClusters();
 
-        for (auto i = 0; i < networkSize; i++) {
-            auto cluster =
-                csNetwork->getCluster(i, plsm::HostMemSpace{});
-            const Region& clReg = cluster.getRegion();
+            for (auto i = 0; i < networkSize; i++) {
+                // Create a Point with the concentration[i] as the value
+                // and add it to myPoints
+                auto cluster =
+                    csNetwork->getCluster(i, plsm::HostMemSpace{});
+                const Region& clReg = cluster.getRegion();
 
-            for (auto j : makeIntervalRange(clReg[Spec::Cs])) {
-                viz::dataprovider::DataPoint aPoint;
-                aPoint.value = gridPointSolution[i];
-                aPoint.t = time;
-                aPoint.x = (double)j;
-                myPoints->push_back(aPoint);
+                for (auto j : makeIntervalRange(clReg[Spec::Cs])) {
+                    viz::dataprovider::DataPoint aPoint;
+                    aPoint.value = gridPointSolution[i];
+                    aPoint.t = time;
+                    aPoint.x = (double)j;
+                    myPoints->push_back(aPoint);
+                }
             }
         }
+
+        // Get the data provider and give it the points
+        _scatterPlot->getDataProvider()->setDataPoints(myPoints);
+
+        // Change the title of the plot and the name of the data
+        std::stringstream title;
+        title << "Size Distribution";
+        _scatterPlot->getDataProvider()->setDataName(title.str());
+        _scatterPlot->plotLabelProvider->titleLabel = title.str();
+        // Give the time to the label provider
+        std::stringstream timeLabel;
+        timeLabel << "time: " << std::setprecision(4) << time << "s";
+        _scatterPlot->plotLabelProvider->timeLabel = timeLabel.str();
+        // Get the current time step
+        PetscReal currentTimeStep;
+        PetscCall(TSGetTimeStep(ts, &currentTimeStep));
+        // Give the timestep to the label provider
+        std::stringstream timeStepLabel;
+        timeStepLabel << "dt: " << std::setprecision(4) << currentTimeStep
+                      << "s";
+        _scatterPlot->plotLabelProvider->timeStepLabel = timeStepLabel.str();
+
+        // Render and save in file
+        std::stringstream fileName;
+        fileName << "Scatter_TS" << timestep << ".png";
+        _scatterPlot->render(fileName.str());
     }
 
-    // Give the points to the data provider
-    _scatterPlot->getDataProvider()->setDataPoints(myPoints);
-
-    // Title
-    std::stringstream title;
-    title << "Size Distribution";
-    _scatterPlot->getDataProvider()->setDataName(title.str());
-    _scatterPlot->plotLabelProvider->titleLabel = title.str();
-
-    // Time label
-    std::stringstream timeLabel;
-    timeLabel << "time: " << std::setprecision(4) << time << "s";
-    _scatterPlot->plotLabelProvider->timeLabel = timeLabel.str();
-
-    // Time step label
-    PetscReal currentTimeStep;
-    PetscCall(TSGetTimeStep(ts, &currentTimeStep));
-    std::stringstream timeStepLabel;
-    timeStepLabel << "dt: " << std::setprecision(4)
-                  << currentTimeStep << "s";
-    _scatterPlot->plotLabelProvider->timeStepLabel =
-        timeStepLabel.str();
-
-    // Render
-    std::stringstream fileName;
-    fileName << "Scatter_TS" << timestep << ".png";
-    _scatterPlot->render(fileName.str());
-
-    // Restore PETSc array
+    // Restore the solutionArray
     PetscCall(DMDAVecRestoreArrayDOFRead(da, solution, &solutionArray));
 
     PetscFunctionReturn(0);
