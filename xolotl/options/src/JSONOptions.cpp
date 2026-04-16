@@ -187,7 +187,7 @@ JSONOptions::defineHandlers()
 		.add(
 			"flux", ElemType::real,
 			"The value of the incoming flux in #/nm2/s.\n"
-			"If the Fuel case is used it actually corresponds to the fission "
+			"If the Fuel case and UO2Cs case is used it actually corresponds to the fission "
 			"rate in #/nm3/s.",
 			JSON_ELEM_HANDLER {
 				if (tree.count(name)) {
@@ -350,9 +350,9 @@ JSONOptions::defineHandlers()
 			"grouping", ElemType::list_integer,
 			"The grouping parameters: the first integer is the size at which "
 			"the grouping starts (HeV clusters in the PSI case, Xe in the NE "
-			"case), the second is the first width of the groups (He for PSI, "
-			"Xe for NE), and the third one in the second width of the groups "
-			"(V for PSI).",
+			"case, Cs in the UO2Cs case), the second is the first width of the"
+			" groups (He for PSI, Xe for NE, Cs for UO2Cs), and the third one"
+			"in the second width of the groups (V for PSI).",
 			JSON_ELEM_HANDLER {
 				if (tree.count(name)) {
 					auto node = tree.get_child(name);
@@ -372,7 +372,7 @@ JSONOptions::defineHandlers()
 			"netParam", ElemType::list_integer,
 			"This option allows the user to define the boundaries of the "
 			"network. To do so, simply write the values in order:\n"
-			"maxHe/Xe/Basal maxD maxT maxV maxI maxPureV",
+			"maxHe/Xe/Cs/Basal maxD maxT maxV maxI maxPureV",
 			JSON_ELEM_HANDLER {
 				if (tree.count(name)) {
 					// Set the flag to not use the HDF5 file

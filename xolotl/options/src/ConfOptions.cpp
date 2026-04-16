@@ -92,7 +92,7 @@ ConfOptions::readParams(int argc, const char* argv[])
 		"The value of the power to use to create the temperature grid spacing, "
 		"only used if heat temperature handler is used. (default = 2.5).")(
 		"flux", bpo::value<double>(&fluxAmplitude),
-		"The value of the incoming flux in #/nm2/s. If the Fuel case is used "
+		"The value of the incoming flux in #/nm2/s. If the Fuel or UO2Cs case is used "
 		"it actually corresponds to the fission rate in #/nm3/s.")("fluxFile",
 		bpo::value<std::string>(&fluxTimeProfileFilePath),
 		"A time profile for the flux is given by the specified file, "
@@ -151,15 +151,15 @@ ConfOptions::readParams(int argc, const char* argv[])
 		"initialDt maxDt growthFactor startTime endTime maxSteps.")("grouping",
 		bpo::value<std::string>(),
 		"The grouping parameters: the first integer is the size at which the "
-		"grouping starts (HeV clusters in the PSI case, Xe in the NE case), "
-		"the second is the first width of the groups (He for PSI, Xe for NE), "
+		"grouping starts (HeV clusters in the PSI case, Xe in the NE case, Cs in the UO2Cs case), "
+		"the second is the first width of the groups (He for PSI, Xe for NE, Cs for UO2Cs), "
 		"and the third one in the second width of the groups (V for PSI).")(
 		"sputtering", bpo::value<double>(&sputteringYield),
 		"The sputtering yield (in atoms/ion) that will be used.")("netParam",
 		bpo::value<std::string>(),
 		"This option allows the user to define the boundaries of the network. "
 		"To do so, simply write the values in order "
-		"maxHe/Xe/Basal maxD maxT maxV maxI maxPureV.")("radiusSize",
+		"maxHe/Xe/Cs/Basal maxD maxT maxV maxI maxPureV.")("radiusSize",
 		bpo::value<std::string>(),
 		"This option allows the user to set a minimum size for the computation "
 		"for the average radii, in the same order as the netParam option "

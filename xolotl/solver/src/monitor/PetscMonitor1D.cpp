@@ -611,7 +611,7 @@ PetscMonitor1D::setup(int loop)
 		}
 	}
 
-if (flagCsRetention) {
+	if (flagCsRetention) {
 		// Get the da from _ts
 		DM da;
 		PetscCallVoid(TSGetDM(_ts, &da));
