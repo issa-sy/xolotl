@@ -583,8 +583,8 @@ PetscSolver1DHandler::initializeConcentration(
 
 	return;
 }
-/** 
 
+/**
 void
 PetscSolver1DHandler::initGBLocation(DM& da, Vec& C)
 {
@@ -632,9 +632,7 @@ PetscSolver1DHandler::initGBLocation(DM& da, Vec& C)
 		}
 	}
 
-	/*
-	 Restore vectors
-	 
+	// Restore vectors
 	PetscCallVoid(DMDAVecRestoreArrayDOF(da, C, &concentrations));
 
 	return;
@@ -644,65 +642,72 @@ PetscSolver1DHandler::initGBLocation(DM& da, Vec& C)
 void
 PetscSolver1DHandler::initGBLocation(DM& da, Vec& C)
 {
-	// Need to use the network here
-	using NEType = core::network::NEReactionNetwork;
-	using UO2CsType = core::network::UO2CsReactionNetwork;
+    // Need to use the NE and UO2Cs network here
+    using NENetworkType = core::network::NEReactionNetwork;
+    using NESpec = typename NENetworkType::Species;
 
-	auto neNetwork = dynamic_cast<NEType*>(&network);
-	auto uo2csNetwork = dynamic_cast<UO2CsType*>(&network);
+    using UO2CsNetworkType = core::network::UO2CsReactionNetwork;
+    using UO2CsSpec = typename UO2CsNetworkType::Species;
 
-	// Pointer for the concentration vector
-	PetscScalar** concentrations = nullptr;
-	PetscCallVoid(DMDAVecGetArrayDOF(da, C, &concentrations));
+    auto* neNetwork = dynamic_cast<NENetworkType*>(&network);
+    auto* uo2csNetwork = dynamic_cast<UO2CsNetworkType*>(&network);
 
-	// Pointer for the concentration vector at a specific grid point
-	PetscScalar* concOffset = nullptr;
+    if (!neNetwork && !uo2csNetwork) {
+        return;
+    }
 
-	// Degrees of freedom
-	const auto dof = network.getDOF();
+    // Pointer for the concentration vector
+    PetscScalar** concentrations = nullptr;
+    PetscCallVoid(DMDAVecGetArrayDOF(da, C, &concentrations));
 
-	// Loop on the GB
-	for (auto const& pair : gbVector) {
+    // Pointer for the concentration vector at a specific grid point
+    PetscScalar* concOffset = nullptr;
 
-		auto xi = std::get<0>(pair);
+    // Degrees of freedom is the total number of clusters in the network
+    // + moments
+    const auto dof = network.getDOF();
 
-		if (xi >= localXS && xi < localXS + localXM) {
+    // Loop on the GB
+    for (auto const& pair : gbVector) {
+        // Get the coordinate of the point
+        auto xi = std::get<0>(pair);
+        // Check if we are on the right process
+        if (xi >= localXS && xi < localXS + localXM) {
+            // Get the local concentration
+            concOffset = concentrations[xi];
 
-			concOffset = concentrations[xi];
+            auto hConcs = HostUnmanaged(concOffset, dof);
+            auto dConcs = Kokkos::View<double*>("Concentrations", dof);
+            deep_copy(dConcs, hConcs);
 
-			auto hConcs = HostUnmanaged(concOffset, dof);
-			auto dConcs = Kokkos::View<double*>("Concentrations", dof);
-			deep_copy(dConcs, hConcs);
+            // Transfer the local amount of Xe clusters
+            if (neNetwork) {
+                setLocalXeRate(
+                    neNetwork->getTotalAtomConcentration(
+                        dConcs, NESpec::Xe, 1),
+                    xi - localXS);
+            }
 
-			// NE case
-			if (neNetwork) {
+            // Transfer the local amount of Cs clusters
+            if (uo2csNetwork) {
+                setLocalCsRate(
+                    uo2csNetwork->getTotalAtomConcentration(
+                        dConcs, UO2CsSpec::Cs, 1),
+                    xi - localXS);
+            }
 
-				setLocalXeRate(
-					neNetwork->getTotalAtomConcentration(dConcs, NEType::Species::Xe, 1),
-					xi - localXS);
-			}
+            // Loop on all the clusters to initialize at 0.0
+            for (auto n = 0; n < dof; n++) {
+                concOffset[n] = 0.0;
+            }
+        }
+    }
 
-			// Cs case
-			if (uo2csNetwork) {
+    // Restore vectors
 
-				setLocalCsRate(
-					uo2csNetwork->getTotalAtomConcentration(dConcs, UO2CsType::Species::Cs, 1),
-					xi - localXS);
-			}
+    PetscCallVoid(DMDAVecRestoreArrayDOF(da, C, &concentrations));
 
-			// reset concentrations
-			for (auto n = 0; n < dof; n++) {
-				concOffset[n] = 0.0;
-			}
-		}
-	}
-
-	/*
-	 Restore vectors
-	 */
-	PetscCallVoid(DMDAVecRestoreArrayDOF(da, C, &concentrations));
-
-	return;
+    return;
 }
 
 std::vector<std::vector<std::vector<std::vector<std::pair<IdType, double>>>>>

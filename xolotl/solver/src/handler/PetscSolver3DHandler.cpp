@@ -5,7 +5,6 @@
 #include <xolotl/core/Types.h>
 #include <xolotl/core/network/IPSIReactionNetwork.h>
 #include <xolotl/core/network/NEReactionNetwork.h>
-#include <xolotl/core/network/UO2CsReactionNetwork.h>
 #include <xolotl/io/XFile.h>
 #include <xolotl/solver/handler/PetscSolver3DHandler.h>
 #include <xolotl/util/Log.h>
@@ -685,7 +684,7 @@ PetscSolver3DHandler::initializeConcentration(
 
 	return;
 }
-/**
+
 void
 PetscSolver3DHandler::initGBLocation(DM& da, Vec& C)
 {
@@ -727,76 +726,6 @@ PetscSolver3DHandler::initGBLocation(DM& da, Vec& C)
 			setLocalXeRate(
 				neNetwork.getTotalAtomConcentration(dConcs, Spec::Xe, 1),
 				xi - localXS, yj - localYS, zk - localZS);
-
-			// Loop on all the clusters to initialize at 0.0
-			for (auto n = 0; n < dof; n++) {
-				concOffset[n] = 0.0;
-			}
-		}
-	}
-
-	/*
-	 Restore vectors
-	 
-	PetscCallVoid(DMDAVecRestoreArrayDOF(da, C, &concentrations));
-
-	return;
-}
-*/
-
-void
-PetscSolver3DHandler::initGBLocation(DM& da, Vec& C)
-{
-	// Pointer for the concentration vector
-	PetscScalar**** concentrations = nullptr;
-	PetscCallVoid(DMDAVecGetArrayDOF(da, C, &concentrations));
-
-	// Pointer for the concentration vector at a specific grid point
-	PetscScalar* concOffset = nullptr;
-
-	// Degrees of freedom is the total number of clusters in the network
-	// + moments
-	const auto dof = network.getDOF();
-
-	// Need to use the NE network here
-	using NEType = core::network::NEReactionNetwork;
-	using UO2CsType = core::network::UO2CsReactionNetwork;
-	using Spec = typename NEType::Species;
-
-	auto neNetwork = dynamic_cast<NEType*>(&network);
-	auto csNetwork = dynamic_cast<UO2CsType*>(&network);
-
-	// Loop on the GB
-	for (auto const& pair : gbVector) {
-		// Get the coordinate of the point
-		auto xi = std::get<0>(pair);
-		auto yj = std::get<1>(pair);
-		auto zk = std::get<2>(pair);
-		// Check if we are on the right process
-		if (xi >= localXS && xi < localXS + localXM && yj >= localYS &&
-			yj < localYS + localYM && zk >= localZS && zk < localZS + localZM) {
-			// Get the local concentration
-			concOffset = concentrations[zk][yj][xi];
-
-			using HostUnmanaged = Kokkos::View<double*, Kokkos::HostSpace,
-				Kokkos::MemoryUnmanaged>;
-			auto hConcs = HostUnmanaged(concOffset, dof);
-			auto dConcs = Kokkos::View<double*>("Concentrations", dof);
-			deep_copy(dConcs, hConcs);
-
-			// Transfer the local amount of Xe clusters
-			if (neNetwork) {
-				setLocalXeRate(
-					neNetwork->getTotalAtomConcentration(dConcs, Spec::Xe, 1),
-					xi - localXS, yj - localYS, zk - localZS);
-			}
-
-			// Transfer the local amount of Cs clusters
-			if (csNetwork) {
-				setLocalCsRate(
-					csNetwork->getTotalAtomConcentration(dConcs, UO2CsType::Species::Cs, 1),
-					xi - localXS, yj - localYS, zk - localZS);
-			}
 
 			// Loop on all the clusters to initialize at 0.0
 			for (auto n = 0; n < dof; n++) {

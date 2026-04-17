@@ -122,7 +122,7 @@ PetscMonitor1D::setup(int loop)
 	PetscCallVoid(
 		PetscOptionsHasName(NULL, NULL, "-xenon_retention", &flagXeRetention));
 
-	// Check the option -cs_retention
+	// Check the option -cesium_retention
 	PetscCallVoid(
 		PetscOptionsHasName(NULL, NULL, "-cesium_retention", &flagCsRetention));
 
@@ -298,7 +298,7 @@ PetscMonitor1D::setup(int loop)
 		}
 	}
 
-	// Set the monitor to save 1D plot of cesium distribution
+	// Set the monitor to save 1D plot of xenon and cesium distribution
 	if (flag1DPlot) {
 		// Only the master process will create the plot
 		if (procId == 0) {
@@ -309,7 +309,18 @@ PetscMonitor1D::setup(int loop)
 
 			// Create and set the label provider
 			auto labelProvider = std::make_shared<viz::LabelProvider>();
-			labelProvider->axis1Label = "Cesium Size";
+			// labelProvider->axis1Label = "Xenon Size";
+			// labelProvider->axis2Label = "Concentration";
+
+			auto& baseNetwork = _solverHandler->getNetwork();
+
+			if (dynamic_cast<core::network::NEReactionNetwork*>(&baseNetwork)) {
+				labelProvider->axis1Label = "Xenon Size";
+			}
+			else if (dynamic_cast<core::network::UO2CsReactionNetwork*>(&baseNetwork)) {
+				labelProvider->axis1Label = "Cesium Size";
+			}
+
 			labelProvider->axis2Label = "Concentration";
 
 			// Give it to the plot
@@ -328,37 +339,6 @@ PetscMonitor1D::setup(int loop)
 			TSMonitorSet(_ts, monitor::monitorScatter, this, nullptr));
 	}
 
-
-		// Set the monitor to save 1D plot of xenon distribution
-	if (flag1DPlot) {
-		// Only the master process will create the plot
-		if (procId == 0) {
-			// Create a ScatterPlot
-			_scatterPlot = vizHandlerRegistry->getPlot(viz::PlotType::SCATTER);
-
-			_scatterPlot->setLogScale();
-
-			// Create and set the label provider
-			auto labelProvider = std::make_shared<viz::LabelProvider>();
-			labelProvider->axis1Label = "Xenon Size";
-			labelProvider->axis2Label = "Concentration";
-
-			// Give it to the plot
-			_scatterPlot->setLabelProvider(labelProvider);
-
-			// Create the data provider
-			auto dataProvider =
-				std::make_shared<viz::dataprovider::CvsXDataProvider>();
-
-			// Give it to the plot
-			_scatterPlot->setDataProvider(dataProvider);
-		}
-
-		// monitorScatter1D will be called at each timestep
-		PetscCallVoid(
-			TSMonitorSet(_ts, monitor::monitorScatter, this, nullptr));
-	}
-	
 	// Set the monitor to save 1D plot of many concentrations
 	if (flagSeries) {
 		// Only the master process will create the plot
@@ -611,6 +591,7 @@ PetscMonitor1D::setup(int loop)
 		}
 	}
 
+	// Set the monitor to compute the cesium retention
 	if (flagCsRetention) {
 		// Get the da from _ts
 		DM da;
@@ -619,7 +600,7 @@ PetscMonitor1D::setup(int loop)
 		PetscInt xm;
 		PetscCallVoid(DMDAGetCorners(da, NULL, NULL, NULL, &xm, NULL, NULL));
 		// Create the local vectors on each process
-		_solverHandler->createLocalUO2Cs(xm);
+		_solverHandler->createLocalNE(xm);
 
 		// Get the previous time if concentrations were stored and initialize
 		// the fluence
@@ -1809,7 +1790,6 @@ PetscMonitor1D::computeAlphaZr(
 
 	PetscFunctionReturn(0);
 }
-
 /**
 PetscErrorCode
 PetscMonitor1D::monitorScatter(
@@ -1975,7 +1955,6 @@ PetscMonitor1D::monitorScatter(
                 auto cluster =
                     xeNetwork->getCluster(i, plsm::HostMemSpace{});
                 const Region& clReg = cluster.getRegion();
-
                 for (auto j : makeIntervalRange(clReg[Spec::Xe])) {
                     viz::dataprovider::DataPoint aPoint;
                     aPoint.value = gridPointSolution[i];
@@ -2002,7 +1981,6 @@ PetscMonitor1D::monitorScatter(
                 auto cluster =
                     csNetwork->getCluster(i, plsm::HostMemSpace{});
                 const Region& clReg = cluster.getRegion();
-
                 for (auto j : makeIntervalRange(clReg[Spec::Cs])) {
                     viz::dataprovider::DataPoint aPoint;
                     aPoint.value = gridPointSolution[i];

@@ -104,43 +104,27 @@ PetscMonitor0D::setup(int loop)
 		PetscCallVoid(TSSetPostStep(_ts, checkTimeStep));
 	}
 
-	// Set the monitor to save 1D plot of xenon distribution
+		// Set the monitor to save 1D plot of xenon distribution
 	if (flag1DPlot) {
 		// Create a ScatterPlot
 		_scatterPlot = vizHandlerRegistry->getPlot(viz::PlotType::SCATTER);
 
-		//		_scatterPlot->setLogScale();
+		//        _scatterPlot->setLogScale();
 
 		// Create and set the label provider
 		auto labelProvider = std::make_shared<viz::LabelProvider>();
-		labelProvider->axis1Label = "Xenon Size";
-		labelProvider->axis2Label = "Concentration";
+		// labelProvider->axis1Label = "Xenon Size";
+		// labelProvider->axis2Label = "Concentration";
 
-		// Give it to the plot
-		_scatterPlot->setLabelProvider(labelProvider);
+		auto& baseNetwork = _solverHandler->getNetwork();
 
-		// Create the data provider
-		auto dataProvider =
-			std::make_shared<viz::dataprovider::CvsXDataProvider>();
+		if (dynamic_cast<core::network::NEReactionNetwork*>(&baseNetwork)) {
+			labelProvider->axis1Label = "Xenon Size";
+		}
+		else if (dynamic_cast<core::network::UO2CsReactionNetwork*>(&baseNetwork)) {
+			labelProvider->axis1Label = "Cesium Size";
+		}
 
-		// Give it to the plot
-		_scatterPlot->setDataProvider(dataProvider);
-
-		// monitorScatter will be called at each timestep
-		PetscCallVoid(
-			TSMonitorSet(_ts, monitor::monitorScatter, this, nullptr));
-	}
-
-	// set the monitor to save 1D plot of cesium distribution
-	if (flag1DPlot) {
-		// Create a ScatterPlot
-		_scatterPlot = vizHandlerRegistry->getPlot(viz::PlotType::SCATTER);
-
-		//		_scatterPlot->setLogScale();
-
-		// Create and set the label provider
-		auto labelProvider = std::make_shared<viz::LabelProvider>();
-		labelProvider->axis1Label = "Cesium Size";
 		labelProvider->axis2Label = "Concentration";
 
 		// Give it to the plot
@@ -694,7 +678,7 @@ PetscMonitor0D::computeAlphaZr(
 	PetscFunctionReturn(0);
 }
 
-/**
+/** 
 PetscErrorCode
 PetscMonitor0D::monitorScatter(
 	TS ts, PetscInt timestep, PetscReal time, Vec solution)
@@ -823,7 +807,6 @@ PetscMonitor0D::monitorScatter(
             auto cluster =
                 xeNetwork->getCluster(i, plsm::HostMemSpace{});
             const Region& clReg = cluster.getRegion();
-
             for (auto j : makeIntervalRange(clReg[Spec::Xe])) {
                 viz::dataprovider::DataPoint aPoint;
                 aPoint.value = gridPointSolution[i];
@@ -850,7 +833,6 @@ PetscMonitor0D::monitorScatter(
             auto cluster =
                 csNetwork->getCluster(i, plsm::HostMemSpace{});
             const Region& clReg = cluster.getRegion();
-
             for (auto j : makeIntervalRange(clReg[Spec::Cs])) {
                 viz::dataprovider::DataPoint aPoint;
                 aPoint.value = gridPointSolution[i];

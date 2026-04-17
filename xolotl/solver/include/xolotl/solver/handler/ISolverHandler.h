@@ -147,8 +147,8 @@ public:
 	 */
 	virtual double
 	getNXeGB() = 0;
-	
-	/**
+
+		/**
 	 * Get the number of Cs that went to the GB.
 	 *
 	 * @return The number of Cesium
@@ -336,13 +336,15 @@ public:
 	createLocalNE(IdType a, IdType b = 1, IdType c = 1) = 0;
 
 	/**
-	 * 
+	 * Create the local UO2Cs data vector.
+	 *
 	 * @param a The size in the x direction
-	 * @param b The size in the y direction	
-	 * @param c The size in the z direction
+	 * @param b The size in the y direction
+	 * @param c The size in the y direction
 	 */
 	virtual void
 	createLocalUO2Cs(IdType a, IdType b = 1, IdType c = 1) = 0;
+
 	/**
 	 * Set the latest value of the local Xe rate.
 	 *
@@ -356,7 +358,7 @@ public:
 
 	/**
 	 * Set the latest value of the local Cs rate.
-	 * 
+	 *
 	 * @param rate The latest value of rate
 	 * @param i The x coordinate of the location
 	 * @param j The y coordinate of the location
@@ -376,14 +378,14 @@ public:
 			rateVector) = 0;
 
 	/**
-	 * Set the whole vector of local UO2Cs data.
+	 * set the whole vector of local UO2Cs data.
 	 * 
 	 * @param rateVector The vector
-	 */
+	 */	
 	virtual void
 	setLocalUO2Cs(
 		const std::vector<std::vector<std::vector<std::array<double, 4>>>>&
-			rateVector) = 0;
+			rateVector) = 0;	
 
 	/**
 	 * Get the local NE data vector that needs to be passed to an app.
@@ -423,7 +425,7 @@ public:
 	setPreviousXeFlux(double flux, IdType i, IdType j = 0, IdType k = 0) = 0;
 
 	/**
-	 * Set the latest value of the local Cs flux.
+	 * Set the latest value of the Cs flux.
 	 *
 	 * @param flux The latest value of flux
 	 * @param i The x coordinate of the location
@@ -434,7 +436,7 @@ public:
 	setPreviousCsFlux(double flux, IdType i, IdType j = 0, IdType k = 0) = 0;
 
 	/**
-	 * Set the latest value of the Xe and Cs monomer concentration.
+	 * Set the latest value of the Xe monomer concentration.
 	 *
 	 * @param conc The latest value of conc
 	 * @param i The x coordinate of the location

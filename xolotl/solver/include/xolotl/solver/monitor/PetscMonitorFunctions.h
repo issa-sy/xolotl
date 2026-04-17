@@ -36,11 +36,11 @@ computeHeliumRetention(
 	TS ts, PetscInt timestep, PetscReal time, Vec solution, void* ictx);
 
 extern PetscErrorCode
-computeCesiumRetention(
+computeXenonRetention(
 	TS ts, PetscInt timestep, PetscReal time, Vec solution, void* ictx);
 
 extern PetscErrorCode
-computeXenonRetention(
+computeCesiumRetention(
 	TS ts, PetscInt timestep, PetscReal time, Vec solution, void* ictx);
 
 extern PetscErrorCode

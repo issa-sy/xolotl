@@ -112,8 +112,8 @@ protected:
 	// fraction
 	std::vector<std::vector<std::vector<std::array<double, 4>>>> localNE;
 
-	//! The vector of quantities to pass to MOOSE.
-	// 0: Cs rate, 1: previous flux, 2: monomer concentration, 3: volume
+		//! The vector of quantities to pass to MOOSE.
+	// 0: Xe rate, 1: previous flux, 2: monomer concentration, 3: volume
 	// fraction
 	std::vector<std::vector<std::vector<std::array<double, 4>>>> localUO2Cs;
 
@@ -386,7 +386,7 @@ public:
 	{
 		return localNE;
 	}
-	
+
 	/**
 	 * \see ISolverHandler.h
 	 */
@@ -423,9 +423,9 @@ public:
 	setMonomerConc(double conc, IdType i, IdType j = 0, IdType k = 0) override
 	{
 		std::get<2>(localNE[i][j][k]) = conc;
-    	std::get<2>(localUO2Cs[i][j][k]) = conc;
+		std::get<2>(localUO2Cs[i][j][k]) = conc;
 	}
-
+	
 	/**
 	 * \see ISolverHandler.h
 	 */
@@ -543,6 +543,7 @@ public:
 	{
 		return nXeGB;
 	}
+
 	/**
 	 * \see ISolverHandler.h
 	 */
@@ -552,9 +553,6 @@ public:
 		return nCsGB;
 	}
 
-	/**
-	 * \see ISolverHandler.h
-	 */
 	void
 	setNXeGB(double nXe) override
 	{

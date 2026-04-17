@@ -48,9 +48,12 @@ public:
 	computeXenonRetention(
 		TS ts, PetscInt timestep, PetscReal time, Vec solution) = 0;
 
+	// Only implemented for 0D and 1D
 	virtual PetscErrorCode
 	computeCesiumRetention(
-		TS ts, PetscInt timestep, PetscReal time, Vec solution) = 0;
+		TS ts, PetscInt timestep, PetscReal time, Vec solution) {
+			return 0;
+		}
 
 	virtual PetscErrorCode
 	computeAlloy(TS ts, PetscInt timestep, PetscReal time, Vec solution) = 0;

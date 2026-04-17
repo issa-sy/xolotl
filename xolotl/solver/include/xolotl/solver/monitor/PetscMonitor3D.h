@@ -59,10 +59,6 @@ public:
 	PetscErrorCode
 	computeXenonRetention(
 		TS ts, PetscInt timestep, PetscReal time, Vec solution) override;
-	
-	PetscErrorCode
-	computeCesiumRetention(
-		TS ts, PetscInt timestep, PetscReal time, Vec solution) override;
 
 	PetscErrorCode
 	eventFunction(
