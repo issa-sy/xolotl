@@ -422,8 +422,10 @@ public:
 	void
 	setMonomerConc(double conc, IdType i, IdType j = 0, IdType k = 0) override
 	{
-		std::get<2>(localNE[i][j][k]) = conc;
-		std::get<2>(localUO2Cs[i][j][k]) = conc;
+		if (!localNE.empty())
+			std::get<2>(localNE[i][j][k]) = conc;
+		if (!localUO2Cs.empty())
+			std::get<2>(localUO2Cs[i][j][k]) = conc;
 	}
 	
 	/**
@@ -433,8 +435,10 @@ public:
 	setVolumeFraction(
 		double frac, IdType i, IdType j = 0, IdType k = 0) override
 	{
-		std::get<3>(localNE[i][j][k]) = frac;
-		std::get<3>(localUO2Cs[i][j][k]) = frac;
+		if (!localNE.empty())
+			std::get<3>(localNE[i][j][k]) = frac;
+		if (!localUO2Cs.empty())
+			std::get<3>(localUO2Cs[i][j][k]) = frac;
 	}
 
 	/**

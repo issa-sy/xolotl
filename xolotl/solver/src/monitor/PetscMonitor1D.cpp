@@ -600,7 +600,7 @@ PetscMonitor1D::setup(int loop)
 		PetscInt xm;
 		PetscCallVoid(DMDAGetCorners(da, NULL, NULL, NULL, &xm, NULL, NULL));
 		// Create the local vectors on each process
-		_solverHandler->createLocalNE(xm);
+		_solverHandler->createLocalUO2Cs(xm);
 
 		// Get the previous time if concentrations were stored and initialize
 		// the fluence
