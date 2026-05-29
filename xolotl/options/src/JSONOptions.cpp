@@ -517,6 +517,13 @@ JSONOptions::defineHandlers()
 				checkSetParam(tree, name, customFluxFilePath);
 			})
 		.add(
+			"initialConcFilePath", ElemType::string,
+			"The path to the custom initial concentration profile file; "
+			"default is an empty string.",
+			JSON_ELEM_HANDLER {
+			checkSetParam(tree, name, initialConcFilePath);
+			})
+		.add(
 			"reactionFilePath", ElemType::string,
 			"The path to the reaction rates file.\n"
 			"(default = \"reaction.dat\")",

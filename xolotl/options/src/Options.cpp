@@ -34,6 +34,7 @@ Options::Options() :
 	vizHandlerName(""),
 	materialName(""),
 	initialConcentration(""),
+	initialConcFilePath(""),
 	interfaceLocation(-1000.0),
 	dimensionNumber(1),
 	gridTypeName(""),
@@ -123,6 +124,7 @@ Options::printAll(std::ostream& os) const
 	os << "vizHandlerName: \"" << vizHandlerName << "\"\n";
 	os << "materialName: \"" << materialName << "\"\n";
 	os << "initialConcentration: \"" << initialConcentration << "\"\n";
+	os << "initialConcFilePath: \"" << initialConcFilePath.string() << "\"\n";
 	os << "zeta: " << zeta << '\n';
 	os << "interfaceLocation: " << interfaceLocation << '\n';
 	os << "dimensionNumber: " << dimensionNumber << '\n';

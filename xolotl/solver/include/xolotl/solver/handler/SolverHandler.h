@@ -107,6 +107,24 @@ protected:
 	//! The initial vacancy concentration.
 	std::vector<std::pair<IdType, double>> initialConc;
 
+	//! True if a custom initial concentration profile file is provided.
+	bool useInitialConcFile{false};
+
+	/**
+	* One initial concentration profile entry for one cluster.
+	* C(x) = max(sum_{k=0}^{15} a_k x^k, 0) * factor, for x <= xCut; else 0
+	*/
+	struct InitialConcProfileEntry
+	{
+	IdType clusterId{NetworkType::invalidIndex()};
+	double factor{0.0};
+	std::array<double, 16> coeffs{};
+	double xCut{0.0};
+	};
+
+	//! Parsed profiles from initialConcFilePath.
+	std::vector<InitialConcProfileEntry> initialConcProfiles;
+
 	//! The vector of quantities to pass to MOOSE.
 	// 0: Xe rate, 1: previous flux, 2: monomer concentration, 3: volume
 	// fraction
@@ -289,6 +307,15 @@ public:
 	{
 		return initialConc;
 	}
+
+	bool
+	hasInitialConcFileProfile() const
+	{
+	return useInitialConcFile && !initialConcProfiles.empty();
+	}
+
+	double
+	computeInitialConcFromFile(IdType clusterId, double x) const;
 
 	/**
 	 * \see ISolverHandler.h

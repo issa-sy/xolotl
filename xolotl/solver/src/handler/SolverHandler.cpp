@@ -1,3 +1,9 @@
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <fstream>
+#include <sstream>
+
 #include <xolotl/factory/perf/PerfHandlerFactory.h>
 #include <xolotl/factory/viz/VizHandlerFactory.h>
 #include <xolotl/solver/handler/SolverHandler.h>
@@ -544,6 +550,87 @@ SolverHandler::initializeHandlers(core::material::IMaterialHandler* material,
 		count += 3;
 	}
 
+	// Set the initial concentration file
+	auto initialConcFilePath = opts.getInitialConcentrationFilePath();
+	useInitialConcFile = !initialConcFilePath.empty();
+	initialConcProfiles.clear();
+
+	if (useInitialConcFile) {
+		std::ifstream in(initialConcFilePath);
+		if (!in) {
+			throw std::runtime_error(
+				"\nCannot open initial concentration profile file: " +
+				initialConcFilePath);
+		}
+
+		std::string line1, line2;
+		while (std::getline(in, line1)) {
+			// skip empty/comment lines
+			if (line1.empty() || line1[0] == '#') {
+				continue;
+			}
+
+			// second line required
+			if (!std::getline(in, line2)) {
+				throw std::runtime_error(
+					"\nMalformed initial concentration profile file: missing "
+					"second line after cluster line.");
+			}
+
+			if (line2.empty() || line2[0] == '#') {
+				throw std::runtime_error(
+					"\nMalformed initial concentration profile file: polynomial "
+					"line cannot be empty/comment.");
+			}
+
+			// parse line1: Species Size Factor
+			std::istringstream iss1(line1);
+			std::string species;
+			int size = 0;
+			double factor = 0.0;
+			iss1 >> species >> size >> factor;
+			if (!iss1 || size <= 0) {
+				throw std::runtime_error(
+					"\nMalformed cluster line in initial concentration profile: " +
+					line1);
+			}
+
+			auto comp = std::vector<AmountType>(network.getSpeciesListSize(), 0);
+			auto clusterSpecies = network.parseSpeciesId(species);
+			comp[clusterSpecies()] = size;
+			auto clusterId = network.findClusterId(comp);
+			if (clusterId == NetworkType::invalidIndex()) {
+				throw std::runtime_error(
+					"\nCluster from initial concentration profile is not in network: " +
+					species + "_" + std::to_string(size));
+			}
+
+			// parse line2: a0..a15 xCut
+			std::istringstream iss2(line2);
+			InitialConcProfileEntry entry;
+			entry.clusterId = (IdType)clusterId;
+			entry.factor = factor;
+			for (int k = 0; k < 16; ++k) {
+				iss2 >> entry.coeffs[k];
+				if (!iss2) {
+					throw std::runtime_error(
+						"\nMalformed polynomial line in initial concentration "
+						"profile (need 16 coeffs + xCut): " +
+						line2);
+				}
+			}
+			iss2 >> entry.xCut;
+			if (!iss2) {
+				throw std::runtime_error(
+					"\nMalformed polynomial line in initial concentration "
+					"profile (missing xCut): " +
+					line2);
+			}
+
+			initialConcProfiles.push_back(entry);
+		}
+	}
+
 	// Set the electronic stopping power
 	electronicStoppingPower = opts.getZeta();
 
@@ -764,6 +851,33 @@ SolverHandler::generateTemperatureGrid()
 	}
 
 	temperature = toReturn;
+}
+
+double
+SolverHandler::computeInitialConcFromFile(IdType clusterId, double x) const
+{
+	double value = 0.0;
+
+	for (const auto& entry : initialConcProfiles) {
+		if (entry.clusterId != clusterId) {
+			continue;
+		}
+		if (x > entry.xCut) {
+			continue;
+		}
+
+		// Horner
+		double poly = entry.coeffs[15];
+		for (int k = 14; k >= 0; --k) {
+			poly = poly * x + entry.coeffs[k];
+		}
+
+		if (poly > 0.0) {
+			value += poly * entry.factor;
+		}
+	}
+
+	return value;
 }
 
 void

@@ -615,24 +615,69 @@ PetscMonitor1D::setup(int loop)
 			// Increment the fluence with the value at this current timestep
 			auto fluences = lastTsGroup->readFluence();
 			fluxHandler->setFluence(fluences);
+
+			// Get the names of the species in the network
+			std::vector<std::string> names;
+			for (auto id = core::network::SpeciesId(numSpecies); id; ++id) {
+				names.push_back(network.getSpeciesName(id));
+			}
+
+			// If the surface is a free surface, read the stored surface fluxes
+			if (_solverHandler->getLeftOffset() == 1) {
+				for (auto i = 0; i < names.size(); i++) {
+					std::ostringstream nName;
+					nName << "n" << names[i] << "Surf";
+					_nSurf[i] = lastTsGroup->readData1D(nName.str());
+
+					std::ostringstream prevFluxName;
+					prevFluxName << "previousFlux" << names[i] << "Surf";
+					_previousSurfFlux[i] =
+						lastTsGroup->readData1D(prevFluxName.str());
+				}
+			}
+
+			// If the bottom is a free surface, read the stored bulk fluxes
+			if (_solverHandler->getRightOffset() == 1) {
+				for (auto i = 0; i < names.size(); i++) {
+					std::ostringstream nName;
+					nName << "n" << names[i] << "Bulk";
+					_nBulk[i] = lastTsGroup->readData1D(nName.str());
+
+					std::ostringstream prevFluxName;
+					prevFluxName << "previousFlux" << names[i] << "Bulk";
+					_previousBulkFlux[i] =
+						lastTsGroup->readData1D(prevFluxName.str());
+				}
+			}
 		}
 
 		// computeFluence will be called at each timestep
 		PetscCallVoid(
 			TSMonitorSet(_ts, monitor::computeFluence, this, nullptr));
 
-		// computeCesiumRetention1D will be called at each timestep
+		// computeCesiumRetention will be called at each timestep
 		PetscCallVoid(
 			TSMonitorSet(_ts, monitor::computeCesiumRetention, this, nullptr));
 
 		// Master process
 		if (procId == 0 and _loopNumber == 0) {
-			// Uncomment to clear the file where the retention will be written
 			std::ofstream outputFile;
 			outputFile.open("retentionOut.txt");
 			outputFile << "#time Cesium_content radius partial_radius "
-						  "partial_bubble_conc partial_size"
-					   << std::endl;
+						  "partial_bubble_conc partial_size";
+			if (_solverHandler->getRightOffset() == 1) {
+				for (auto id = core::network::SpeciesId(numSpecies); id; ++id) {
+					auto speciesName = network.getSpeciesName(id);
+					outputFile << " " << speciesName << "_bulk";
+				}
+			}
+			if (_solverHandler->getLeftOffset() == 1) {
+				for (auto id = core::network::SpeciesId(numSpecies); id; ++id) {
+					auto speciesName = network.getSpeciesName(id);
+					outputFile << " " << speciesName << "_surface";
+				}
+			}
+			outputFile << std::endl;
 			outputFile.close();
 		}
 	}
@@ -1493,8 +1538,8 @@ PetscMonitor1D::computeCesiumRetention(
 
 	// Loop on the grid
 	for (auto xi = xs; xi < xs + xm; xi++) {
-		// Get the pointer to the beginning of the solution data for this grid
-		// point
+		// Get the pointer to the beginning of the solution data for this
+		// grid point
 		gridPointSolution = solutionArray[xi];
 
 		using HostUnmanaged =
@@ -1526,7 +1571,6 @@ PetscMonitor1D::computeCesiumRetention(
 		partialRadii += totals[5] * hx;
 
 		_solverHandler->setVolumeFraction(totals[6], xi - xs);
-
 		_solverHandler->setMonomerConc(
 			gridPointSolution[csCluster.getId()], xi - xs);
 	}
@@ -1554,24 +1598,18 @@ PetscMonitor1D::computeCesiumRetention(
 	auto& localUO2Cs = _solverHandler->getLocalUO2Cs();
 	// Loop on the GB
 	for (auto const& pair : gbVector) {
-		// Middle
 		auto xi = std::get<0>(pair);
-		// Check we are on the right proc
 		if (xi >= xs && xi < xs + xm) {
 			double previousCsFlux = std::get<1>(localUO2Cs[xi - xs][0][0]);
 			globalCsFlux += previousCsFlux * (grid[xi + 1] - grid[xi]);
-			// Set the amount in the vector we keep
 			_solverHandler->setLocalCsRate(previousCsFlux * dt, xi - xs);
 		}
 	}
 	double totalCsFlux = 0.0;
 	MPI_Reduce(
 		&globalCsFlux, &totalCsFlux, 1, MPI_DOUBLE, MPI_SUM, 0, xolotlComm);
-	// Master process
 	if (procId == 0) {
-		// Get the previous value of Cs that went to the GB
 		double nCesium = _solverHandler->getNCsGB();
-		// Compute the total number of Cs that went to the GB
 		nCesium += totalCsFlux * dt;
 		_solverHandler->setNCsGB(nCesium);
 	}
@@ -1583,11 +1621,10 @@ PetscMonitor1D::computeCesiumRetention(
 	auto diffusionHandler = _solverHandler->getDiffusionHandler();
 	auto diffusingIds = diffusionHandler->getDiffusingIds();
 
-	// Loop on the GB
+	// Loop on the GB to update the previous Cs flux
 	for (auto const& pair : gbVector) {
 		// Local rate
 		auto myRate = std::vector<double>(numSpecies, 0.0);
-		// Define left and right with reference to the middle point
 		// Middle
 		auto xi = std::get<0>(pair);
 
@@ -1606,27 +1643,160 @@ PetscMonitor1D::computeCesiumRetention(
 			hxRight = grid[xi + 1] - grid[xi];
 		}
 		double factor = 2.0 / (hxLeft + hxRight);
-		// Check we are on the right proc
+
 		if (xi >= xs && xi < xs + xm) {
 			// Left
 			xi = std::get<0>(pair) - 1;
-			// Get the pointer to the beginning of the solution data for this
-			// grid point
 			gridPointSolution = solutionArray[xi];
-			// Compute the flux coming from the left
 			network.updateOutgoingDiffFluxes(gridPointSolution, factor / hxLeft,
 				diffusingIds, myRate, xi + 1 - xs);
 
 			// Right
 			xi = std::get<0>(pair) + 1;
 			gridPointSolution = solutionArray[xi];
-			// Compute the flux coming from the right
 			network.updateOutgoingDiffFluxes(gridPointSolution,
 				factor / hxRight, diffusingIds, myRate, xi + 1 - xs);
 
 			// Middle
 			xi = std::get<0>(pair);
 			_solverHandler->setPreviousCsFlux(myRate[0], xi - xs);
+		}
+	}
+
+	// Look at the fluxes leaving the free surface
+	if (_solverHandler->getLeftOffset() == 1) {
+		// Set the surface position
+		auto xi = 1;
+
+		// Value to know on which processor is the surface
+		int surfaceProc = 0;
+
+		// Check we are on the right proc
+		if (xi >= xs && xi < xs + xm) {
+			// Compute the total number of impurities that left at the surface
+			if (timestep > 0) {
+				for (auto i = 0; i < numSpecies; ++i)
+					_nSurf[i] += _previousSurfFlux[i] * dt;
+			}
+
+			// Get the pointer to the beginning of the solution data for this
+			// grid point
+			gridPointSolution = solutionArray[xi];
+
+			// Factor for finite difference
+			double hxLeft = 0.0, hxRight = 0.0;
+			if (xi >= 1 && xi < Mx) {
+				hxLeft = (grid[xi + 1] - grid[xi - 1]) / 2.0;
+				hxRight = (grid[xi + 2] - grid[xi]) / 2.0;
+			}
+			else if (xi < 1) {
+				hxLeft = grid[xi + 1] - grid[xi];
+				hxRight = (grid[xi + 2] - grid[xi]) / 2.0;
+			}
+			else {
+				hxLeft = (grid[xi + 1] - grid[xi - 1]) / 2.0;
+				hxRight = grid[xi + 1] - grid[xi];
+			}
+			double factor = 2.0 / (hxLeft + hxRight);
+
+			// Compute the outgoing diffusion flux
+			auto myFluxData = std::vector<double>(numSpecies, 0.0);
+			network.updateOutgoingDiffFluxes(
+				gridPointSolution, factor, diffusingIds, myFluxData, xi - xs);
+
+			for (auto i = 0; i < numSpecies; ++i)
+				_previousSurfFlux[i] = myFluxData[i];
+
+			// Set the surface processor
+			surfaceProc = procId;
+		}
+
+		// Get which processor will send the information
+		int surfaceId = 0;
+		MPI_Allreduce(
+			&surfaceProc, &surfaceId, 1, MPI_INT, MPI_SUM, xolotlComm);
+
+		// Send the information about impurities to the other processes
+		std::vector<double> countFluxData;
+		for (auto i = 0; i < numSpecies; ++i) {
+			countFluxData.push_back(_nSurf[i]);
+			countFluxData.push_back(_previousSurfFlux[i]);
+		}
+		MPI_Bcast(countFluxData.data(), countFluxData.size(), MPI_DOUBLE,
+			surfaceId, xolotlComm);
+
+		// Extract impurity data from broadcast buffer
+		for (auto i = 0; i < numSpecies; ++i) {
+			_nSurf[i]            = countFluxData[2 * i];
+			_previousSurfFlux[i] = countFluxData[(2 * i) + 1];
+		}
+	}
+
+	// Look at the fluxes going in the bulk if the bottom is a free surface
+	if (_solverHandler->getRightOffset() == 1) {
+		// Set the bottom surface position
+		auto xi = Mx - 2;
+
+		// Value to know on which processor is the bottom
+		int bottomProc = 0;
+
+		// Check we are on the right proc
+		if (xi >= xs && xi < xs + xm) {
+			// Compute the total number of impurities that went in the bulk
+			if (timestep > 0) {
+				for (auto i = 0; i < numSpecies; ++i)
+					_nBulk[i] += _previousBulkFlux[i] * dt;
+			}
+
+			// Get the pointer to the beginning of the solution data for this
+			// grid point
+			gridPointSolution = solutionArray[xi];
+
+			// Factor for finite difference
+			double hxLeft = 0.0, hxRight = 0.0;
+			if (xi >= 1 && xi < Mx) {
+				hxLeft = (grid[xi + 1] - grid[xi - 1]) / 2.0;
+				hxRight = (grid[xi + 2] - grid[xi]) / 2.0;
+			}
+			else if (xi < 1) {
+				hxLeft = grid[xi + 1] - grid[xi];
+				hxRight = (grid[xi + 2] - grid[xi]) / 2.0;
+			}
+			else {
+				hxLeft = (grid[xi + 1] - grid[xi - 1]) / 2.0;
+				hxRight = grid[xi + 1] - grid[xi];
+			}
+			double factor = 2.0 / (hxLeft + hxRight);
+
+			// Compute the outgoing diffusion flux
+			auto myFluxData = std::vector<double>(numSpecies, 0.0);
+			network.updateOutgoingDiffFluxes(
+				gridPointSolution, factor, diffusingIds, myFluxData, xi - xs);
+
+			for (auto i = 0; i < numSpecies; ++i)
+				_previousBulkFlux[i] = myFluxData[i];
+
+			// Set the bottom processor
+			bottomProc = procId;
+		}
+
+		// Get which processor will send the information
+		int bottomId = 0;
+		MPI_Allreduce(&bottomProc, &bottomId, 1, MPI_INT, MPI_SUM, xolotlComm);
+
+		// Send the information about impurities to the other processes
+		std::vector<double> countFluxData;
+		for (auto i = 0; i < numSpecies; ++i) {
+			countFluxData.push_back(_nBulk[i]);
+			countFluxData.push_back(_previousBulkFlux[i]);
+		}
+		MPI_Bcast(countFluxData.data(), countFluxData.size(), MPI_DOUBLE,
+			bottomId, xolotlComm);
+
+		// Extract impurity data from broadcast buffer
+		for (auto i = 0; i < numSpecies; ++i) {
+			_nBulk[i]            = countFluxData[2 * i];
+			_previousBulkFlux[i] = countFluxData[(2 * i) + 1];
 		}
 	}
 
@@ -1657,7 +1827,19 @@ PetscMonitor1D::computeCesiumRetention(
 		outputFile.open("retentionOut.txt", std::ios::app);
 		outputFile << time << " " << totalConcData[0] << " " << averageRadius
 				   << " " << averagePartialRadius << " " << totalConcData[3]
-				   << " " << averagePartialSize << std::endl;
+				   << " " << averagePartialSize;
+
+		// Write the outgoing surface and bulk fluxes
+		if (_solverHandler->getRightOffset() == 1) {
+			for (auto i = 0; i < numSpecies; ++i)
+				outputFile << " " << _nBulk[i];
+		}
+		if (_solverHandler->getLeftOffset() == 1) {
+			for (auto i = 0; i < numSpecies; ++i)
+				outputFile << " " << _nSurf[i];
+		}
+
+		outputFile << std::endl;
 		outputFile.close();
 	}
 

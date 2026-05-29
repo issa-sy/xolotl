@@ -213,7 +213,10 @@ ConfOptions::readParams(int argc, const char* argv[])
 		"ignored.")("customFluxFilePath",
 		bpo::value<fs::path>(&customFluxFilePath),
 		"The path to the custom flux profile file; the default is an empty "
-		"string that will use the default material associated flux handler.")(
+		"string that will use the default material associated flux handler.")
+		("initialConcFilePath",
+		bpo::value<fs::path>(&initialConcFilePath)->default_value(""),
+		"Path to custom initial concentration profile file")(
 		"reactionFilePath",
 		bpo::value<fs::path>(&reactionFilePath)->default_value("reaction.dat"),
 		"The path to the reaction rates file; the default is reaction.dat .")(

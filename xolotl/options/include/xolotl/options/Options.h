@@ -129,6 +129,11 @@ protected:
 	std::string initialConcentration;
 
 	/**
+	* The path to the custom initial concentration profile file
+	*/
+	fs::path initialConcFilePath;
+
+	/**
 	 * Value of the electronic stopping power.
 	 */
 	double zeta;
@@ -531,6 +536,15 @@ public:
 	getInitialConcentration() const override
 	{
 		return initialConcentration;
+	}
+
+	/**
+	* \see IOptions.h
+	*/
+	std::string
+	getInitialConcentrationFilePath() const override
+	{
+	return initialConcFilePath.string();
 	}
 
 	/**

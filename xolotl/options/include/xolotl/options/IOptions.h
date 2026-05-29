@@ -194,6 +194,14 @@ public:
 	getInitialConcentration() const = 0;
 
 	/**
+	* Obtain the path to the file describing the initial concentration profile.
+	*
+	* @return The path to the file
+	*/
+	virtual std::string
+	getInitialConcentrationFilePath() const = 0;
+
+	/**
 	 * Obtain the value of the electronic stopping power.
 	 *
 	 * @return Zeta

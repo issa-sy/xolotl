@@ -335,11 +335,32 @@ PetscSolver1DHandler::initializeConcentration(
 				concOffset[n] = 0.0;
 			}
 
+			/**
 			// Initialize the option specified concentration
 			if (i >= leftOffset and not hasConcentrations and
 				i < nX - rightOffset) {
 				for (auto pair : initialConc) {
 					concOffset[pair.first] = pair.second;
+				}
+			}
+		}
+		*/
+
+			// Initialize the option specified concentration
+			if (i >= leftOffset and not hasConcentrations and
+				i < nX - rightOffset) {
+				if (hasInitialConcFileProfile()) {
+					// x = centre de maille, en nm, relatif à la surface (grid[1])
+					double x = ((grid[i] + grid[i + 1]) / 2.0) - grid[1];
+					for (const auto& prof : initialConcProfiles) {
+						concOffset[prof.clusterId] =
+							computeInitialConcFromFile(prof.clusterId, x);
+					}
+				}
+				else {
+					for (auto pair : initialConc) {
+						concOffset[pair.first] = pair.second;
+					}
 				}
 			}
 		}
